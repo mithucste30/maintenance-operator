@@ -34,7 +34,7 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["kopf", "run", "/app/operator.py", "--verbose"]
+          command: ["kopf", "run", "/app/maintenance_operator.py", "--verbose"]
           env:
             - name: POD_NAMESPACE
               valueFrom:
