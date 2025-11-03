@@ -160,7 +160,7 @@ def create_maintenance_service(namespace):
         ),
         subsets=[client.V1EndpointSubset(
             addresses=[client.V1EndpointAddress(ip=ip) for ip in pod_ips],
-            ports=[client.V1EndpointPort(
+            ports=[client.CoreV1EndpointPort(
                 name='http',
                 port=MAINTENANCE_SERVICE_PORT,
                 protocol='TCP'
