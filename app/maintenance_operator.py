@@ -270,19 +270,21 @@ def handle_ingressroute(spec, name, namespace, labels, meta, **kwargs):
         }
         create_backup_configmap(name, namespace, backup_data)
 
+        # Create ExternalName service in target namespace (for Traefik cross-namespace restriction)
+        proxy_service_name = create_maintenance_service(namespace)
+
         # Get custom page name if specified
         custom_page = annotations.get(CUSTOM_PAGE_ANNOTATION)
 
-        # Update IngressRoute to point to maintenance service
+        # Update IngressRoute to point to maintenance proxy service (same namespace, no namespace field)
         new_routes = []
         if spec.get('routes'):
             for route in spec['routes']:
                 new_route = route.copy()
-                # Replace all services with maintenance service
+                # Replace all services with maintenance proxy service (same namespace)
                 new_route['services'] = [{
-                    'name': MAINTENANCE_SERVICE_NAME,
-                    'port': MAINTENANCE_SERVICE_PORT,
-                    'namespace': OPERATOR_NAMESPACE
+                    'name': proxy_service_name,
+                    'port': MAINTENANCE_SERVICE_PORT
                 }]
                 new_routes.append(new_route)
 
@@ -339,6 +341,9 @@ def handle_ingressroute(spec, name, namespace, labels, meta, **kwargs):
 
             # Delete backup ConfigMap
             delete_backup_configmap(name, namespace)
+
+            # Delete the proxy service
+            delete_maintenance_service(namespace)
 
             logger.info(f"Maintenance mode disabled for IngressRoute {namespace}/{name}")
 
