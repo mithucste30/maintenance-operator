@@ -334,11 +334,28 @@ def handle_ingressroute(spec, name, namespace, labels, meta, **kwargs):
         proxy_service_name = create_maintenance_service(namespace)
 
         # Get custom page name if specified
-        custom_page = annotations.get(CUSTOM_PAGE_ANNOTATION)
+        custom_page = annotations.get(CUSTOM_PAGE_ANNOTATION, '').strip()
+
+        # Always try to clean up any existing middleware first (in case we're switching pages)
+        potential_middleware_name = f"{name}-maintenance-page"
+        try:
+            custom_api.delete_namespaced_custom_object(
+                group='traefik.io',
+                version='v1alpha1',
+                namespace=namespace,
+                plural='middlewares',
+                name=potential_middleware_name
+            )
+            logger.info(f"Deleted existing middleware {potential_middleware_name}")
+        except ApiException as e:
+            if e.status != 404:
+                logger.warning(f"Error deleting existing middleware: {e}")
+            # 404 is fine - middleware doesn't exist
 
         # Create middleware to inject custom page header if specified
+        # Only create if custom_page is set and not "default"
         middleware_name = None
-        if custom_page:
+        if custom_page and custom_page.lower() != 'default':
             middleware_name = f"{name}-maintenance-page"
             middleware = {
                 'apiVersion': 'traefik.io/v1alpha1',
@@ -389,11 +406,18 @@ def handle_ingressroute(spec, name, namespace, labels, meta, **kwargs):
                     'name': proxy_service_name,
                     'port': MAINTENANCE_SERVICE_PORT
                 }]
-                # Add custom page middleware if specified
+                # Remove our maintenance page middleware if it exists (in case we're switching pages)
+                existing_middlewares = new_route.get('middlewares', [])
+                filtered_middlewares = [
+                    mw for mw in existing_middlewares
+                    if mw.get('name') != potential_middleware_name
+                ]
+                # Add custom page middleware if specified (at the beginning)
                 if middleware_name:
-                    existing_middlewares = new_route.get('middlewares', [])
-                    # Add our middleware to the beginning
-                    new_route['middlewares'] = [{'name': middleware_name}] + existing_middlewares
+                    new_route['middlewares'] = [{'name': middleware_name}] + filtered_middlewares
+                else:
+                    # No custom page - use filtered middlewares without our maintenance middleware
+                    new_route['middlewares'] = filtered_middlewares
                 new_routes.append(new_route)
 
         # Patch the IngressRoute
