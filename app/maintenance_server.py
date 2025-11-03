@@ -56,19 +56,20 @@ def get_custom_page(page_name, content_type):
 def get_best_content_type(accept_header):
     """
     Determine the best content type based on Accept header
+    Priority: HTML > JSON > XML (since browsers commonly request HTML)
     """
     if not accept_header:
         return 'html'
 
     accept_lower = accept_header.lower()
 
-    # Check in priority order
-    if 'application/json' in accept_lower:
+    # Check in priority order - HTML first for browser compatibility
+    if 'text/html' in accept_lower:
+        return 'html'
+    elif 'application/json' in accept_lower:
         return 'json'
     elif 'application/xml' in accept_lower or 'text/xml' in accept_lower:
         return 'xml'
-    elif 'text/html' in accept_lower:
-        return 'html'
     elif '*/*' in accept_lower:
         return 'html'
 
