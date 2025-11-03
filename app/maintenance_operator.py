@@ -98,6 +98,53 @@ def delete_backup_configmap(name, namespace):
             logger.error(f"Error deleting backup ConfigMap: {e}")
 
 
+def create_maintenance_service(namespace):
+    """Create an ExternalName service in target namespace pointing to maintenance service"""
+    service_name = f"{MAINTENANCE_SERVICE_NAME}-proxy"
+
+    # ExternalName service to point to maintenance service in operator namespace
+    service = client.V1Service(
+        metadata=client.V1ObjectMeta(
+            name=service_name,
+            namespace=namespace,
+            labels={'app': 'maintenance-operator', 'managed-by': 'maintenance-operator'}
+        ),
+        spec=client.V1ServiceSpec(
+            type='ExternalName',
+            external_name=f"{MAINTENANCE_SERVICE_NAME}.{OPERATOR_NAMESPACE}.svc.cluster.local",
+            ports=[client.V1ServicePort(
+                name='http',
+                port=MAINTENANCE_SERVICE_PORT,
+                target_port=MAINTENANCE_SERVICE_PORT
+            )]
+        )
+    )
+
+    try:
+        v1.create_namespaced_service(namespace, service)
+        logger.info(f"Created maintenance proxy service {service_name} in namespace {namespace}")
+        return service_name
+    except ApiException as e:
+        if e.status == 409:  # Already exists
+            logger.info(f"Maintenance proxy service {service_name} already exists in namespace {namespace}")
+            return service_name
+        else:
+            logger.error(f"Error creating maintenance proxy service: {e}")
+            raise
+
+
+def delete_maintenance_service(namespace):
+    """Delete the ExternalName service from target namespace"""
+    service_name = f"{MAINTENANCE_SERVICE_NAME}-proxy"
+
+    try:
+        v1.delete_namespaced_service(service_name, namespace)
+        logger.info(f"Deleted maintenance proxy service {service_name} from namespace {namespace}")
+    except ApiException as e:
+        if e.status != 404:
+            logger.error(f"Error deleting maintenance proxy service: {e}")
+
+
 @kopf.on.create('networking.k8s.io', 'v1', 'ingresses')
 @kopf.on.update('networking.k8s.io', 'v1', 'ingresses')
 def handle_ingress(spec, name, namespace, labels, annotations, **kwargs):
@@ -118,15 +165,18 @@ def handle_ingress(spec, name, namespace, labels, annotations, **kwargs):
         }
         create_backup_configmap(name, namespace, backup_data)
 
+        # Create ExternalName service in target namespace (for cross-namespace support)
+        proxy_service_name = create_maintenance_service(namespace)
+
         # Get custom page name if specified
         custom_page = None
         if annotations and CUSTOM_PAGE_ANNOTATION in annotations:
             custom_page = annotations[CUSTOM_PAGE_ANNOTATION]
 
-        # Update Ingress to point to maintenance service
+        # Update Ingress to point to maintenance proxy service (same namespace)
         new_backend = client.V1IngressBackend(
             service=client.V1IngressServiceBackend(
-                name=MAINTENANCE_SERVICE_NAME,
+                name=proxy_service_name,
                 port=client.V1ServiceBackendPort(number=MAINTENANCE_SERVICE_PORT)
             )
         )
@@ -142,7 +192,7 @@ def handle_ingress(spec, name, namespace, labels, annotations, **kwargs):
                     new_path = path.copy()
                     new_path['backend'] = {
                         'service': {
-                            'name': MAINTENANCE_SERVICE_NAME,
+                            'name': proxy_service_name,
                             'port': {'number': MAINTENANCE_SERVICE_PORT}
                         }
                     }
@@ -193,6 +243,9 @@ def handle_ingress(spec, name, namespace, labels, annotations, **kwargs):
 
             # Delete backup ConfigMap
             delete_backup_configmap(name, namespace)
+
+            # Delete the proxy service
+            delete_maintenance_service(namespace)
 
             logger.info(f"Maintenance mode disabled for Ingress {namespace}/{name}")
 

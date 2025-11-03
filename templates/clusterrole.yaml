@@ -21,10 +21,10 @@ rules:
     resources: ["configmaps"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
-  # Service permissions (to read maintenance service)
+  # Service permissions (to manage proxy services for cross-namespace support)
   - apiGroups: [""]
     resources: ["services"]
-    verbs: ["get", "list"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
 
   # Events permissions (for logging)
   - apiGroups: [""]
