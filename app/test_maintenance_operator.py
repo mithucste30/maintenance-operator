@@ -1,14 +1,22 @@
 """Tests for maintenance_operator.py"""
 import pytest
 from unittest.mock import Mock, patch, MagicMock
-from maintenance_operator import (
-    is_under_maintenance,
-    create_backup_configmap,
-    get_backup_configmap,
-    delete_backup_configmap,
-    create_maintenance_service,
-    delete_maintenance_service,
-)
+import sys
+
+# Mock kubernetes config loading before importing the module
+with patch('kubernetes.config.load_incluster_config'), \
+     patch('kubernetes.config.load_kube_config'), \
+     patch('kubernetes.client.CoreV1Api'), \
+     patch('kubernetes.client.NetworkingV1Api'), \
+     patch('kubernetes.client.CustomObjectsApi'):
+    from maintenance_operator import (
+        is_under_maintenance,
+        create_backup_configmap,
+        get_backup_configmap,
+        delete_backup_configmap,
+        create_maintenance_service,
+        delete_maintenance_service,
+    )
 
 
 class TestIsUnderMaintenance:

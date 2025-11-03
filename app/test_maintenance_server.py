@@ -1,7 +1,13 @@
 """Tests for maintenance_server.py"""
 import pytest
 import json
-from maintenance_server import app
+from unittest.mock import patch
+
+# Mock kubernetes config loading before importing the module
+with patch('kubernetes.config.load_incluster_config'), \
+     patch('kubernetes.config.load_kube_config'), \
+     patch('kubernetes.client.CoreV1Api'):
+    from maintenance_server import app
 
 
 @pytest.fixture
