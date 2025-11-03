@@ -8,6 +8,8 @@ and redirects traffic to maintenance page when label is present
 import os
 import json
 import logging
+import threading
+import time
 import kopf
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
@@ -459,6 +461,18 @@ def update_all_proxy_endpoints():
         logger.error(f"Error in update_all_proxy_endpoints: {e}")
 
 
+def endpoint_reconciliation_worker():
+    """Background worker to periodically reconcile proxy service endpoints"""
+    logger.info("Endpoint reconciliation worker started")
+    while True:
+        try:
+            time.sleep(300)  # Wait 5 minutes
+            logger.debug("Running periodic endpoint reconciliation")
+            update_all_proxy_endpoints()
+        except Exception as e:
+            logger.error(f"Error in endpoint reconciliation worker: {e}")
+
+
 @kopf.on.startup()
 def configure(settings: kopf.OperatorSettings, **_):
     """Configure operator settings"""
@@ -469,20 +483,7 @@ def configure(settings: kopf.OperatorSettings, **_):
     # Update all existing proxy endpoints on startup
     update_all_proxy_endpoints()
 
-
-@kopf.daemon()
-async def reconcile_endpoints(stopped, **_):
-    """Periodically reconcile all proxy service endpoints to ensure they point to current operator pods"""
-    import asyncio
-
-    while not stopped:
-        try:
-            await asyncio.sleep(300)  # Wait 5 minutes
-            if not stopped:
-                logger.debug("Running periodic endpoint reconciliation")
-                update_all_proxy_endpoints()
-        except asyncio.CancelledError:
-            logger.info("Endpoint reconciliation daemon stopped")
-            break
-        except Exception as e:
-            logger.error(f"Error in endpoint reconciliation daemon: {e}")
+    # Start background thread for periodic reconciliation
+    reconciliation_thread = threading.Thread(target=endpoint_reconciliation_worker, daemon=True)
+    reconciliation_thread.start()
+    logger.info("Started endpoint reconciliation background thread")
