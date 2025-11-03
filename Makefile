@@ -121,7 +121,7 @@ deploy:
 run-operator:
 	@echo "Starting operator locally..."
 	@echo "Make sure you have a kubeconfig configured"
-	kopf run app/operator.py --verbose
+	kopf run app/maintenance_operator.py --verbose
 
 # Run maintenance server locally
 run-server:

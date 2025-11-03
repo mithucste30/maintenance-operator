@@ -17,4 +17,4 @@ RUN groupadd -g 1000 appuser || true && \
 USER appuser
 
 # Default command (can be overridden)
-CMD ["kopf", "run", "/app/operator.py", "--verbose"]
+CMD ["kopf", "run", "/app/maintenance_operator.py", "--verbose"]
