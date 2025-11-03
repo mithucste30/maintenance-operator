@@ -1,5 +1,11 @@
 # Maintenance Operator
 
+[![Release](https://img.shields.io/github/v/release/mithucste30/maintenance-operator?style=flat-square)](https://github.com/mithucste30/maintenance-operator/releases)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/mithucste30/maintenance-operator/release.yml?branch=main&style=flat-square)](https://github.com/mithucste30/maintenance-operator/actions)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
+[![Kubernetes](https://img.shields.io/badge/kubernetes-%3E%3D1.19-blue?style=flat-square&logo=kubernetes)](https://kubernetes.io)
+[![Helm](https://img.shields.io/badge/helm-v3-blue?style=flat-square&logo=helm)](https://helm.sh)
+
 A Kubernetes operator that manages maintenance mode for Ingress and IngressRoute (Traefik) resources. When you add an annotation to an Ingress or IngressRoute, the operator automatically redirects traffic to a maintenance page.
 
 ## Features
