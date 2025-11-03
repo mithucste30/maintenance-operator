@@ -336,6 +336,49 @@ def handle_ingressroute(spec, name, namespace, labels, meta, **kwargs):
         # Get custom page name if specified
         custom_page = annotations.get(CUSTOM_PAGE_ANNOTATION)
 
+        # Create middleware to inject custom page header if specified
+        middleware_name = None
+        if custom_page:
+            middleware_name = f"{name}-maintenance-page"
+            middleware = {
+                'apiVersion': 'traefik.io/v1alpha1',
+                'kind': 'Middleware',
+                'metadata': {
+                    'name': middleware_name,
+                    'namespace': namespace,
+                    'labels': {'app': 'maintenance-operator', 'managed-by': 'maintenance-operator'}
+                },
+                'spec': {
+                    'headers': {
+                        'customRequestHeaders': {
+                            'X-Maintenance-Page': custom_page
+                        }
+                    }
+                }
+            }
+            try:
+                custom_api.create_namespaced_custom_object(
+                    group='traefik.io',
+                    version='v1alpha1',
+                    namespace=namespace,
+                    plural='middlewares',
+                    body=middleware
+                )
+                logger.info(f"Created middleware {middleware_name} for custom page {custom_page}")
+            except ApiException as e:
+                if e.status == 409:
+                    custom_api.patch_namespaced_custom_object(
+                        group='traefik.io',
+                        version='v1alpha1',
+                        namespace=namespace,
+                        plural='middlewares',
+                        name=middleware_name,
+                        body=middleware
+                    )
+                    logger.info(f"Updated middleware {middleware_name} for custom page {custom_page}")
+                else:
+                    raise
+
         # Update IngressRoute to point to maintenance proxy service (same namespace, no namespace field)
         new_routes = []
         if spec.get('routes'):
@@ -346,6 +389,11 @@ def handle_ingressroute(spec, name, namespace, labels, meta, **kwargs):
                     'name': proxy_service_name,
                     'port': MAINTENANCE_SERVICE_PORT
                 }]
+                # Add custom page middleware if specified
+                if middleware_name:
+                    existing_middlewares = new_route.get('middlewares', [])
+                    # Add our middleware to the beginning
+                    new_route['middlewares'] = [{'name': middleware_name}] + existing_middlewares
                 new_routes.append(new_route)
 
         # Patch the IngressRoute
@@ -404,6 +452,21 @@ def handle_ingressroute(spec, name, namespace, labels, meta, **kwargs):
 
             # Delete the proxy service
             delete_maintenance_service(namespace)
+
+            # Delete custom page middleware if it exists
+            middleware_name = f"{name}-maintenance-page"
+            try:
+                custom_api.delete_namespaced_custom_object(
+                    group='traefik.io',
+                    version='v1alpha1',
+                    namespace=namespace,
+                    plural='middlewares',
+                    name=middleware_name
+                )
+                logger.info(f"Deleted middleware {middleware_name}")
+            except ApiException as e:
+                if e.status != 404:
+                    logger.error(f"Error deleting middleware: {e}")
 
             logger.info(f"Maintenance mode disabled for IngressRoute {namespace}/{name}")
 

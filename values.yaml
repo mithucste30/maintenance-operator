@@ -5,7 +5,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/mithucste30/maintenance-operator
   pullPolicy: IfNotPresent
-  tag: "0.1.10"
+  tag: "0.2.0"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -76,15 +76,74 @@ maintenance:
       </response>
 
   # Custom pages for specific ingresses/routes
+  # The key becomes the page name referenced in the annotation
   # Format (HTML must be base64 encoded):
   # customPages:
-  #   my-app-ingress:
-  #     htmlBase64: "PGh0bWw+Li4uPC9odG1sPg=="
-  #   another-app:
-  #     htmlBase64: "PGh0bWw+Li4uPC9odG1sPg=="
+  #   my-custom-page:
+  #     html: "<html>...</html>"  # Plain HTML (will be used as-is)
   #     json: |
   #       {"message": "Custom message"}
-  customPages: {}
+  #     xml: |
+  #       <?xml version="1.0"?><response>...</response>
+  customPages:
+    whoami-custom:
+      html: |
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Scheduled Maintenance - Whoami Service</title>
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body {
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    display: flex; justify-content: center; align-items: center;
+                    min-height: 100vh; padding: 20px;
+                }
+                .maintenance-container {
+                    background: white; border-radius: 20px; padding: 60px 40px;
+                    box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center;
+                    max-width: 600px; width: 100%; animation: slideIn 0.5s ease-out;
+                }
+                @keyframes slideIn { from { opacity: 0; transform: translateY(-30px); } to { opacity: 1; transform: translateY(0); } }
+                .icon { font-size: 80px; margin-bottom: 30px; animation: bounce 2s infinite; }
+                @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+                h1 { color: #2d3748; font-size: 2.5em; margin-bottom: 20px; font-weight: 700; }
+                .subtitle { color: #667eea; font-size: 1.3em; margin-bottom: 30px; font-weight: 600; }
+                p { color: #4a5568; line-height: 1.8; margin-bottom: 20px; font-size: 1.1em; }
+                .service-name {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white; padding: 8px 16px; border-radius: 8px;
+                    font-weight: bold; display: inline-block; margin: 10px 0;
+                }
+                .status-badge {
+                    background: #fed7d7; color: #c53030; padding: 10px 20px;
+                    border-radius: 25px; font-weight: 600; display: inline-block; margin: 20px 0;
+                }
+                .footer {
+                    margin-top: 40px; padding-top: 30px; border-top: 2px solid #e2e8f0;
+                    color: #718096; font-size: 0.9em;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="maintenance-container">
+                <div class="icon">🔧</div>
+                <h1>Scheduled Maintenance</h1>
+                <div class="subtitle">Whoami Service</div>
+                <div class="status-badge">🔴 Currently Offline</div>
+                <p>We're performing scheduled maintenance to improve your experience.</p>
+                <div class="service-name">whoami.kahf.co.uk</div>
+                <p>Our team is working hard to get everything back online as quickly as possible.</p>
+                <div class="footer">
+                    <p><strong>Expected Duration:</strong> Approximately 30 minutes</p>
+                    <p><strong>Status:</strong> In Progress</p>
+                </div>
+            </div>
+        </body>
+        </html>
 
 # Operator configuration
 operator:

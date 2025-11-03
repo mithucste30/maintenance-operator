@@ -1,0 +1,24 @@
+{{- range $pageName, $pageContent := .Values.maintenance.customPages }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: maintenance-page-{{ $pageName }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "maintenance-operator.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: custom-pages
+data:
+  {{- if $pageContent.html }}
+  page.html: |
+{{ $pageContent.html | indent 4 }}
+  {{- end }}
+  {{- if $pageContent.json }}
+  page.json: |
+{{ $pageContent.json | indent 4 }}
+  {{- end }}
+  {{- if $pageContent.xml }}
+  page.xml: |
+{{ $pageContent.xml | indent 4 }}
+  {{- end }}
+{{- end }}

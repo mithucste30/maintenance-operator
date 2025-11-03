@@ -20,6 +20,11 @@ rules:
     resources: ["ingressroutes"]
     verbs: ["get", "list", "watch", "patch", "update"]
 
+  # Middleware (Traefik) permissions for custom page headers
+  - apiGroups: ["traefik.io", "traefik.containo.us"]
+    resources: ["middlewares"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+
   # ConfigMap permissions (for backups and custom pages)
   - apiGroups: [""]
     resources: ["configmaps"]
