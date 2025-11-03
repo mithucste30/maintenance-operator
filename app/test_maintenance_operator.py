@@ -9,7 +9,7 @@ with patch('kubernetes.config.load_incluster_config'), \
      patch('kubernetes.client.CoreV1Api'), \
      patch('kubernetes.client.NetworkingV1Api'), \
      patch('kubernetes.client.CustomObjectsApi'):
-    from maintenance_operator import (
+    from utils import (
         is_under_maintenance,
         create_backup_configmap,
         get_backup_configmap,
@@ -49,7 +49,7 @@ class TestIsUnderMaintenance:
 class TestBackupConfigMap:
     """Test ConfigMap backup functions"""
 
-    @patch('maintenance_operator.v1')
+    @patch('utils.v1')
     def test_create_backup_configmap(self, mock_v1):
         """Test creating backup ConfigMap"""
         name = "test-ingress"
@@ -65,7 +65,7 @@ class TestBackupConfigMap:
         # Check that namespace was passed
         assert namespace in str(call_args)
 
-    @patch('maintenance_operator.v1')
+    @patch('utils.v1')
     def test_get_backup_configmap_success(self, mock_v1):
         """Test retrieving backup ConfigMap"""
         name = "test-ingress"
@@ -80,7 +80,7 @@ class TestBackupConfigMap:
         assert result == {"rules": [{"host": "example.com"}]}
         mock_v1.read_namespaced_config_map.assert_called_once()
 
-    @patch('maintenance_operator.v1')
+    @patch('utils.v1')
     def test_get_backup_configmap_not_found(self, mock_v1):
         """Test retrieving non-existent backup ConfigMap"""
         from kubernetes.client.rest import ApiException
@@ -94,7 +94,7 @@ class TestBackupConfigMap:
 
         assert result is None
 
-    @patch('maintenance_operator.v1')
+    @patch('utils.v1')
     def test_delete_backup_configmap(self, mock_v1):
         """Test deleting backup ConfigMap"""
         name = "test-ingress"
@@ -111,8 +111,8 @@ class TestBackupConfigMap:
 class TestMaintenanceService:
     """Test maintenance service management"""
 
-    @patch('maintenance_operator.v1')
-    @patch('maintenance_operator.get_maintenance_pod_ips')
+    @patch('utils.v1')
+    @patch('utils.get_maintenance_pod_ips')
     def test_create_maintenance_service(self, mock_get_ips, mock_v1):
         """Test creating maintenance proxy service"""
         namespace = "default"
@@ -126,7 +126,7 @@ class TestMaintenanceService:
         # Verify endpoints were created
         mock_v1.create_namespaced_endpoints.assert_called_once()
 
-    @patch('maintenance_operator.v1')
+    @patch('utils.v1')
     def test_create_maintenance_service_already_exists(self, mock_v1):
         """Test creating service when it already exists (should update)"""
         from kubernetes.client.rest import ApiException
@@ -139,7 +139,7 @@ class TestMaintenanceService:
 
         assert "maintenance-operator-proxy" in service_name
 
-    @patch('maintenance_operator.v1')
+    @patch('utils.v1')
     def test_delete_maintenance_service(self, mock_v1):
         """Test deleting maintenance proxy service"""
         namespace = "default"
