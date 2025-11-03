@@ -470,8 +470,19 @@ def configure(settings: kopf.OperatorSettings, **_):
     update_all_proxy_endpoints()
 
 
-@kopf.timer('', interval=300.0)  # Run every 5 minutes
-def reconcile_endpoints(**_):
+@kopf.daemon()
+async def reconcile_endpoints(stopped, **_):
     """Periodically reconcile all proxy service endpoints to ensure they point to current operator pods"""
-    logger.debug("Running periodic endpoint reconciliation")
-    update_all_proxy_endpoints()
+    import asyncio
+
+    while not stopped:
+        try:
+            await asyncio.sleep(300)  # Wait 5 minutes
+            if not stopped:
+                logger.debug("Running periodic endpoint reconciliation")
+                update_all_proxy_endpoints()
+        except asyncio.CancelledError:
+            logger.info("Endpoint reconciliation daemon stopped")
+            break
+        except Exception as e:
+            logger.error(f"Error in endpoint reconciliation daemon: {e}")
