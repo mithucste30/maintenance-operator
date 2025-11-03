@@ -235,7 +235,7 @@ def handle_ingress(spec, name, namespace, labels, annotations, **kwargs):
 
             # Remove backup annotation
             if annotations:
-                new_annotations = annotations.copy()
+                new_annotations = dict(annotations)
                 new_annotations.pop(BACKUP_ANNOTATION, None)
                 ingress_patch['metadata'] = {'annotations': new_annotations}
 
@@ -316,7 +316,7 @@ def handle_ingressroute(spec, name, namespace, labels, meta, **kwargs):
         backup_data = get_backup_configmap(name, namespace)
         if backup_data:
             # Restore original configuration
-            new_annotations = annotations.copy()
+            new_annotations = dict(annotations)
             new_annotations.pop(BACKUP_ANNOTATION, None)
 
             patch = {

@@ -11,6 +11,10 @@ rules:
     resources: ["ingresses"]
     verbs: ["get", "list", "watch", "patch", "update"]
 
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses/status"]
+    verbs: ["get", "patch", "update"]
+
   # IngressRoute (Traefik) permissions
   - apiGroups: ["traefik.io", "traefik.containo.us"]
     resources: ["ingressroutes"]
