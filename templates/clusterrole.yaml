@@ -30,6 +30,16 @@ rules:
     resources: ["services"]
     verbs: ["get", "list", "create", "update", "patch", "delete"]
 
+  # Endpoints permissions (for managing service endpoints)
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+
+  # Pod permissions (to get maintenance operator pod IPs)
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+
   # Events permissions (for logging)
   - apiGroups: [""]
     resources: ["events"]

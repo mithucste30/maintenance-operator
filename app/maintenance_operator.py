@@ -98,11 +98,26 @@ def delete_backup_configmap(name, namespace):
             logger.error(f"Error deleting backup ConfigMap: {e}")
 
 
+def get_maintenance_pod_ips():
+    """Get IP addresses of maintenance operator pods"""
+    try:
+        pods = v1.list_namespaced_pod(
+            namespace=OPERATOR_NAMESPACE,
+            label_selector=f'app.kubernetes.io/name={MAINTENANCE_SERVICE_NAME}'
+        )
+        pod_ips = [pod.status.pod_ip for pod in pods.items if pod.status.pod_ip]
+        logger.info(f"Found {len(pod_ips)} maintenance operator pod IPs: {pod_ips}")
+        return pod_ips
+    except ApiException as e:
+        logger.error(f"Error getting maintenance pod IPs: {e}")
+        return []
+
+
 def create_maintenance_service(namespace):
-    """Create an ExternalName service in target namespace pointing to maintenance service"""
+    """Create a ClusterIP service and Endpoints in target namespace pointing to maintenance pods"""
     service_name = f"{MAINTENANCE_SERVICE_NAME}-proxy"
 
-    # ExternalName service to point to maintenance service in operator namespace
+    # Create ClusterIP service (without selector - we'll manually create endpoints)
     service = client.V1Service(
         metadata=client.V1ObjectMeta(
             name=service_name,
@@ -110,12 +125,12 @@ def create_maintenance_service(namespace):
             labels={'app': 'maintenance-operator', 'managed-by': 'maintenance-operator'}
         ),
         spec=client.V1ServiceSpec(
-            type='ExternalName',
-            external_name=f"{MAINTENANCE_SERVICE_NAME}.{OPERATOR_NAMESPACE}.svc.cluster.local",
+            type='ClusterIP',
             ports=[client.V1ServicePort(
                 name='http',
                 port=MAINTENANCE_SERVICE_PORT,
-                target_port=MAINTENANCE_SERVICE_PORT
+                target_port=MAINTENANCE_SERVICE_PORT,
+                protocol='TCP'
             )]
         )
     )
@@ -123,20 +138,63 @@ def create_maintenance_service(namespace):
     try:
         v1.create_namespaced_service(namespace, service)
         logger.info(f"Created maintenance proxy service {service_name} in namespace {namespace}")
-        return service_name
     except ApiException as e:
         if e.status == 409:  # Already exists
             logger.info(f"Maintenance proxy service {service_name} already exists in namespace {namespace}")
-            return service_name
         else:
             logger.error(f"Error creating maintenance proxy service: {e}")
             raise
 
+    # Get maintenance pod IPs
+    pod_ips = get_maintenance_pod_ips()
+    if not pod_ips:
+        logger.warning("No maintenance operator pods found, service may not work until pods are available")
+        return service_name
+
+    # Create Endpoints object pointing to maintenance pods
+    endpoints = client.V1Endpoints(
+        metadata=client.V1ObjectMeta(
+            name=service_name,
+            namespace=namespace,
+            labels={'app': 'maintenance-operator', 'managed-by': 'maintenance-operator'}
+        ),
+        subsets=[client.V1EndpointSubset(
+            addresses=[client.V1EndpointAddress(ip=ip) for ip in pod_ips],
+            ports=[client.V1EndpointPort(
+                name='http',
+                port=MAINTENANCE_SERVICE_PORT,
+                protocol='TCP'
+            )]
+        )]
+    )
+
+    try:
+        v1.create_namespaced_endpoints(namespace, endpoints)
+        logger.info(f"Created endpoints for {service_name} in namespace {namespace} pointing to {pod_ips}")
+    except ApiException as e:
+        if e.status == 409:  # Already exists
+            v1.patch_namespaced_endpoints(service_name, namespace, endpoints)
+            logger.info(f"Updated endpoints for {service_name} in namespace {namespace}")
+        else:
+            logger.error(f"Error creating endpoints: {e}")
+            raise
+
+    return service_name
+
 
 def delete_maintenance_service(namespace):
-    """Delete the ExternalName service from target namespace"""
+    """Delete the proxy service and endpoints from target namespace"""
     service_name = f"{MAINTENANCE_SERVICE_NAME}-proxy"
 
+    # Delete endpoints
+    try:
+        v1.delete_namespaced_endpoints(service_name, namespace)
+        logger.info(f"Deleted endpoints {service_name} from namespace {namespace}")
+    except ApiException as e:
+        if e.status != 404:
+            logger.error(f"Error deleting endpoints: {e}")
+
+    # Delete service
     try:
         v1.delete_namespaced_service(service_name, namespace)
         logger.info(f"Deleted maintenance proxy service {service_name} from namespace {namespace}")
@@ -165,7 +223,7 @@ def handle_ingress(spec, name, namespace, labels, annotations, **kwargs):
         }
         create_backup_configmap(name, namespace, backup_data)
 
-        # Create ExternalName service in target namespace (for cross-namespace support)
+        # Create proxy service with endpoints in target namespace (for cross-namespace support)
         proxy_service_name = create_maintenance_service(namespace)
 
         # Get custom page name if specified
@@ -270,7 +328,7 @@ def handle_ingressroute(spec, name, namespace, labels, meta, **kwargs):
         }
         create_backup_configmap(name, namespace, backup_data)
 
-        # Create ExternalName service in target namespace (for Traefik cross-namespace restriction)
+        # Create proxy service with endpoints in target namespace (for Traefik cross-namespace restriction)
         proxy_service_name = create_maintenance_service(namespace)
 
         # Get custom page name if specified
