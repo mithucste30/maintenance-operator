@@ -406,9 +406,72 @@ def handle_ingressroute(spec, name, namespace, labels, meta, **kwargs):
             logger.info(f"Maintenance mode disabled for IngressRoute {namespace}/{name}")
 
 
+def update_all_proxy_endpoints():
+    """Update all proxy service endpoints across all namespaces to point to current operator pods"""
+    try:
+        # Get current operator pod IPs
+        pod_ips = get_maintenance_pod_ips()
+        if not pod_ips:
+            logger.warning("No maintenance operator pods found, skipping endpoint updates")
+            return
+
+        # Find all proxy services across all namespaces
+        services = v1.list_service_for_all_namespaces(
+            label_selector='app=maintenance-operator,managed-by=maintenance-operator'
+        )
+
+        updated_count = 0
+        for service in services.items:
+            service_name = service.metadata.name
+            namespace = service.metadata.namespace
+
+            # Skip if not a proxy service
+            if not service_name.startswith(f"{MAINTENANCE_SERVICE_NAME}-proxy"):
+                continue
+
+            try:
+                # Update the endpoints to point to current pod IPs
+                endpoints = client.V1Endpoints(
+                    metadata=client.V1ObjectMeta(
+                        name=service_name,
+                        namespace=namespace,
+                        labels={'app': 'maintenance-operator', 'managed-by': 'maintenance-operator'}
+                    ),
+                    subsets=[client.V1EndpointSubset(
+                        addresses=[client.V1EndpointAddress(ip=ip) for ip in pod_ips],
+                        ports=[client.CoreV1EndpointPort(
+                            name='http',
+                            port=MAINTENANCE_SERVICE_PORT,
+                            protocol='TCP'
+                        )]
+                    )]
+                )
+
+                v1.patch_namespaced_endpoints(service_name, namespace, endpoints)
+                updated_count += 1
+                logger.info(f"Updated endpoints for {service_name} in namespace {namespace} to {pod_ips}")
+            except ApiException as e:
+                logger.error(f"Error updating endpoints for {service_name} in {namespace}: {e}")
+
+        if updated_count > 0:
+            logger.info(f"Updated {updated_count} proxy service endpoint(s)")
+    except Exception as e:
+        logger.error(f"Error in update_all_proxy_endpoints: {e}")
+
+
 @kopf.on.startup()
 def configure(settings: kopf.OperatorSettings, **_):
     """Configure operator settings"""
     settings.persistence.finalizer = 'maintenance-operator.kahf.io/finalizer'
     settings.posting.enabled = True
     logger.info("Maintenance Operator started")
+
+    # Update all existing proxy endpoints on startup
+    update_all_proxy_endpoints()
+
+
+@kopf.timer('', interval=300.0)  # Run every 5 minutes
+def reconcile_endpoints(**_):
+    """Periodically reconcile all proxy service endpoints to ensure they point to current operator pods"""
+    logger.debug("Running periodic endpoint reconciliation")
+    update_all_proxy_endpoints()
