@@ -1,25 +1,26 @@
 # Maintenance Operator
 
-A Kubernetes operator that manages maintenance mode for Ingress and IngressRoute (Traefik) resources. When you add a label to an Ingress or IngressRoute, the operator automatically redirects traffic to a maintenance page.
+A Kubernetes operator that manages maintenance mode for Ingress and IngressRoute (Traefik) resources. When you add an annotation to an Ingress or IngressRoute, the operator automatically redirects traffic to a maintenance page.
 
 ## Features
 
-- **Automatic maintenance mode**: Simply add a label to enable maintenance
+- **Automatic maintenance mode**: Simply add an annotation to enable maintenance
 - **Works with standard Ingress and Traefik IngressRoute** resources
 - **Multiple content types**: Serves HTML, JSON, and XML based on client Accept headers
 - **Custom maintenance pages**: Configure different pages for different services
 - **Automatic backup and restore**: Original service configuration is stored and restored automatically
 - **Proper HTTP status codes**: Returns 503 Service Unavailable by default
 - **Zero downtime**: Seamlessly switches between normal and maintenance mode
+- **Annotation-based configuration**: All settings managed through annotations
 
 ## How It Works
 
-1. **Enable maintenance mode**: Add the label `under-maintenance: "true"` to any Ingress or IngressRoute
-2. **Operator takes over**: The operator detects the label and:
+1. **Enable maintenance mode**: Add the annotation `maintenance-operator.kahf.io/enabled: "true"` to any Ingress or IngressRoute
+2. **Operator takes over**: The operator detects the annotation and:
    - Stores the original service configuration in a ConfigMap
    - Redirects traffic to the maintenance page service
-   - Adds an annotation to track the backup
-3. **Disable maintenance mode**: Remove the label
+   - Tracks the backup state
+3. **Disable maintenance mode**: Remove the annotation
 4. **Automatic restore**: The operator restores the original service configuration and cleans up backups
 
 ## Installation
@@ -123,63 +124,42 @@ helm install maintenance-operator . \
 For a standard Ingress:
 
 ```bash
-kubectl label ingress my-app under-maintenance=true
+kubectl annotate ingress my-app maintenance-operator.kahf.io/enabled=true
 ```
 
 For a Traefik IngressRoute:
 
 ```bash
-kubectl label ingressroute my-app under-maintenance=true
+kubectl annotate ingressroute my-app maintenance-operator.kahf.io/enabled=true
 ```
 
 ### Disable Maintenance Mode
 
 ```bash
-kubectl label ingress my-app under-maintenance-
+kubectl annotate ingress my-app maintenance-operator.kahf.io/enabled-
 # or
-kubectl label ingressroute my-app under-maintenance-
+kubectl annotate ingressroute my-app maintenance-operator.kahf.io/enabled-
 ```
 
 ### Custom Maintenance Pages
 
-You can configure custom maintenance pages in the `values.yaml`. HTML content must be base64 encoded to keep the values file clean.
+You can configure custom maintenance pages in the `values.yaml`.
 
-#### Step 1: Create your HTML file
-
-```bash
-cat > my-maintenance.html <<'EOF'
-<!DOCTYPE html>
-<html>
-<head><title>My App - Under Maintenance</title></head>
-<body>
-  <h1>My App is Under Maintenance</h1>
-  <p>We're upgrading our systems. Back soon!</p>
-</body>
-</html>
-EOF
-```
-
-#### Step 2: Encode the HTML to base64
-
-```bash
-# Using the provided script (recommended)
-./scripts/encode-html.sh my-maintenance.html
-
-# Or manually with base64 command
-base64 < my-maintenance.html
-
-# Or using Python script
-python scripts/encode-html.py my-maintenance.html
-```
-
-#### Step 3: Add to values.yaml
+#### Step 1: Add to values.yaml
 
 ```yaml
 maintenance:
   customPages:
     my-app:
-      # Base64 encoded HTML
-      htmlBase64: "PCFET0NUWVBFIGh0bWw+CjxodG1sPgo8aGVhZD48dGl0bGU+TXkgQXBwIC0gVW5kZXIgTWFpbnRlbmFuY2U8L3RpdGxlPjwvaGVhZD4KPGJvZHk+CiAgPGgxPk15IEFwcCBpcyBVbmRlciBNYWludGVuYW5jZTwvaDE+CiAgPHA+V2UncmUgdXBncmFkaW5nIG91ciBzeXN0ZW1zLiBCYWNrIHNvb24hPC9wPgo8L2JvZHk+CjwvaHRtbD4K"
+      html: |
+        <!DOCTYPE html>
+        <html>
+        <head><title>My App - Under Maintenance</title></head>
+        <body>
+          <h1>My App is Under Maintenance</h1>
+          <p>We're upgrading our systems. Back soon!</p>
+        </body>
+        </html>
       json: |
         {
           "status": "maintenance",
@@ -194,16 +174,24 @@ maintenance:
         </response>
 ```
 
-#### Step 4: Apply and use the custom page
+#### Step 2: Apply and use the custom page
 
 ```bash
 # Upgrade the Helm release
-helm upgrade maintenance-operator .
+helm upgrade maintenance-operator . -n maintenance-operator
 
 # Enable maintenance with custom page
-kubectl label ingress my-app under-maintenance=true
 kubectl annotate ingress my-app \
+  maintenance-operator.kahf.io/enabled=true \
   maintenance-operator.kahf.io/custom-page=my-app
+```
+
+#### Switch to default page
+
+```bash
+# Use "default" value or remove the annotation
+kubectl annotate ingress my-app \
+  maintenance-operator.kahf.io/custom-page=default --overwrite
 ```
 
 ### Content Negotiation
@@ -224,26 +212,40 @@ Key configuration options in `values.yaml`:
 ```yaml
 # Operator configuration
 operator:
-  maintenanceLabel: "under-maintenance"
-  maintenanceLabelValue: "true"
-  backupAnnotation: "maintenance-operator.kahf.io/original-service"
+  # Annotation to enable maintenance mode
+  maintenanceAnnotation: "maintenance-operator.kahf.io/enabled"
+  maintenanceAnnotationValue: "true"
+
+  # Annotation to specify custom maintenance page
   customPageAnnotation: "maintenance-operator.kahf.io/custom-page"
+
+  # Internal annotations (managed by operator)
+  backupAnnotation: "maintenance-operator.kahf.io/original-service"
+  backupConfigMapPrefix: "maintenance-backup"
 
 # Maintenance page configuration
 maintenance:
   httpStatusCode: 503  # HTTP status code returned
+
   defaultPage:
-    # HTML must be base64 encoded
-    htmlBase64: "PCFET0NUWVBFIGh0bWw+Li4u"  # Your base64 encoded HTML
+    html: |
+      <!DOCTYPE html>
+      <html>...</html>
     json: |
       {"status": "maintenance"}
     xml: |
       <?xml version="1.0"?><response>...</response>
-```
 
-**Note:** HTML content must be base64 encoded. Use the provided helper scripts:
-- `./scripts/encode-html.sh <file.html>`
-- `python scripts/encode-html.py <file.html>`
+  customPages:
+    my-app:
+      html: |
+        <!DOCTYPE html>
+        <html>...</html>
+      json: |
+        {"status": "maintenance", "app": "my-app"}
+      xml: |
+        <?xml version="1.0"?><response>...</response>
+```
 
 ## Architecture
 
@@ -287,52 +289,55 @@ python app/maintenance_server.py
 ### Example 1: Enable maintenance for an Ingress
 
 ```bash
-# Apply the label
-kubectl label ingress my-app under-maintenance=true
+# Enable maintenance mode
+kubectl annotate ingress my-app maintenance-operator.kahf.io/enabled=true
 
 # Check the backup was created
-kubectl get configmap maintenance-backup-my-app
+kubectl get configmap -n maintenance-operator maintenance-backup-my-app
 
-# Remove the label to restore
-kubectl label ingress my-app under-maintenance-
+# Disable maintenance mode to restore
+kubectl annotate ingress my-app maintenance-operator.kahf.io/enabled-
 ```
 
 ### Example 2: Use a custom page
 
-1. Create and encode your custom HTML:
-
-```bash
-# Create HTML file
-cat > special-page.html <<'EOF'
-<html><body><h1>Special Maintenance Page</h1></body></html>
-EOF
-
-# Encode to base64
-./scripts/encode-html.sh special-page.html
-# Copy the output
-```
-
-2. Add custom page to `values.yaml`:
+1. Add custom page to `values.yaml`:
 
 ```yaml
 maintenance:
   customPages:
     my-special-app:
-      htmlBase64: "PGh0bWw+PGJvZHk+PGgxPlNwZWNpYWwgTWFpbnRlbmFuY2UgUGFnZTwvaDE+PC9ib2R5PjwvaHRtbD4K"
+      html: |
+        <!DOCTYPE html>
+        <html>
+        <body>
+          <h1>Special Maintenance Page</h1>
+          <p>We're making things better!</p>
+        </body>
+        </html>
+      json: |
+        {"status": "maintenance", "message": "Special maintenance"}
 ```
 
-3. Upgrade the Helm release:
+2. Upgrade the Helm release:
 
 ```bash
-helm upgrade maintenance-operator .
+helm upgrade maintenance-operator . -n maintenance-operator
 ```
 
-4. Apply the label and annotation:
+3. Enable maintenance with custom page:
 
 ```bash
-kubectl label ingress my-app under-maintenance=true
 kubectl annotate ingress my-app \
+  maintenance-operator.kahf.io/enabled=true \
   maintenance-operator.kahf.io/custom-page=my-special-app
+```
+
+4. Switch to default page:
+
+```bash
+kubectl annotate ingress my-app \
+  maintenance-operator.kahf.io/custom-page=default --overwrite
 ```
 
 ## Troubleshooting
@@ -389,9 +394,9 @@ The script will:
 ### Manual Uninstall
 
 ```bash
-# Remove maintenance labels from all resources (optional)
-kubectl label ingress --all under-maintenance- --all-namespaces
-kubectl label ingressroute --all under-maintenance- --all-namespaces
+# Remove maintenance annotations from all resources (optional)
+kubectl annotate ingress --all maintenance-operator.kahf.io/enabled- --all-namespaces
+kubectl annotate ingressroute --all maintenance-operator.kahf.io/enabled- --all-namespaces
 
 # Uninstall Helm release
 helm uninstall maintenance-operator -n maintenance-operator

@@ -30,10 +30,6 @@ MAINTENANCE_SERVICE_NAME = os.getenv('MAINTENANCE_SERVICE_NAME', 'maintenance-op
 MAINTENANCE_SERVICE_PORT = int(os.getenv('MAINTENANCE_SERVICE_PORT', '8080'))
 OPERATOR_NAMESPACE = os.getenv('POD_NAMESPACE', 'default')
 
-# Legacy label support (deprecated - use annotations instead)
-LEGACY_MAINTENANCE_LABEL = os.getenv('MAINTENANCE_LABEL', 'under-maintenance')
-LEGACY_MAINTENANCE_LABEL_VALUE = os.getenv('MAINTENANCE_LABEL_VALUE', 'true')
-
 # Load Kubernetes config
 try:
     config.load_incluster_config()
@@ -45,18 +41,11 @@ networking_v1 = client.NetworkingV1Api()
 custom_api = client.CustomObjectsApi()
 
 
-def is_under_maintenance(annotations, labels=None):
-    """Check if resource is in maintenance mode via annotation (or legacy label for backward compatibility)"""
-    # Check annotation first (new standard)
-    if annotations and annotations.get(MAINTENANCE_ANNOTATION) == MAINTENANCE_ANNOTATION_VALUE:
-        return True
-
-    # Check legacy label for backward compatibility
-    if labels and labels.get(LEGACY_MAINTENANCE_LABEL) == LEGACY_MAINTENANCE_LABEL_VALUE:
-        logger.warning("Using legacy label for maintenance mode. Please migrate to annotation: maintenance-operator.kahf.io/enabled=true")
-        return True
-
-    return False
+def is_under_maintenance(annotations):
+    """Check if resource is in maintenance mode via annotation"""
+    if not annotations:
+        return False
+    return annotations.get(MAINTENANCE_ANNOTATION) == MAINTENANCE_ANNOTATION_VALUE
 
 
 def create_backup_configmap(name, namespace, backup_data):
@@ -218,11 +207,11 @@ def delete_maintenance_service(namespace):
 
 @kopf.on.create('networking.k8s.io', 'v1', 'ingresses')
 @kopf.on.update('networking.k8s.io', 'v1', 'ingresses')
-def handle_ingress(spec, name, namespace, labels, annotations, **kwargs):
+def handle_ingress(spec, name, namespace, annotations, **kwargs):
     """Handle Ingress resources"""
     logger.info(f"Processing Ingress {namespace}/{name}")
 
-    under_maintenance = is_under_maintenance(annotations, labels)
+    under_maintenance = is_under_maintenance(annotations)
     has_backup = annotations and BACKUP_ANNOTATION in annotations
 
     if under_maintenance and not has_backup:
@@ -323,12 +312,12 @@ def handle_ingress(spec, name, namespace, labels, annotations, **kwargs):
 
 @kopf.on.create('traefik.io', 'v1alpha1', 'ingressroutes')
 @kopf.on.update('traefik.io', 'v1alpha1', 'ingressroutes')
-def handle_ingressroute(spec, name, namespace, labels, meta, old, new, **kwargs):
+def handle_ingressroute(spec, name, namespace, meta, old, new, **kwargs):
     """Handle Traefik IngressRoute resources"""
     logger.info(f"Processing IngressRoute {namespace}/{name}")
 
     annotations = meta.get('annotations', {})
-    under_maintenance = is_under_maintenance(annotations, labels)
+    under_maintenance = is_under_maintenance(annotations)
     has_backup = BACKUP_ANNOTATION in annotations
 
     if under_maintenance and not has_backup:

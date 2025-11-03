@@ -54,11 +54,6 @@ spec:
               value: {{ include "maintenance-operator.fullname" . | quote }}
             - name: MAINTENANCE_SERVICE_PORT
               value: {{ .Values.service.port | quote }}
-            # Legacy label support (for backward compatibility)
-            - name: MAINTENANCE_LABEL
-              value: {{ .Values.operator.maintenanceLabel | default "under-maintenance" | quote }}
-            - name: MAINTENANCE_LABEL_VALUE
-              value: {{ .Values.operator.maintenanceLabelValue | default "true" | quote }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
