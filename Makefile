@@ -75,8 +75,22 @@ version:
 	rm -f Chart.yaml.bak values.yaml.bak
 	@echo "✓ Version updated to $(IMAGE_TAG)"
 
-# Create a release (for maintainers)
-release: version
+# Create a release using automated script (recommended)
+release:
+ifndef VERSION
+	@echo "❌ Error: VERSION is required"
+	@echo ""
+	@echo "Usage: make release VERSION=0.1.0"
+	@echo ""
+	@echo "Or use the release script directly:"
+	@echo "  ./release.sh 0.1.0"
+	@exit 1
+else
+	@./release.sh $(VERSION)
+endif
+
+# Create a release (manual method)
+release-manual: version
 	@echo "Creating release $(IMAGE_TAG)..."
 	git add Chart.yaml values.yaml
 	git commit -m "chore: bump version to $(IMAGE_TAG)" || true
@@ -131,7 +145,7 @@ help:
 	@echo "  make test           - Run tests"
 	@echo "  make package        - Package Helm chart"
 	@echo "  make version        - Update version in files"
-	@echo "  make release        - Create a new release tag"
+	@echo "  make release        - Create and push release (requires VERSION=x.y.z)"
 	@echo "  make dev-setup      - Setup development environment"
 	@echo "  make deploy         - Deploy using script"
 	@echo "  make run-operator   - Run operator locally"
@@ -148,4 +162,8 @@ help:
 	@echo "Examples:"
 	@echo "  make build IMAGE_TAG=0.2.0"
 	@echo "  make ghcr-push IMAGE_TAG=0.2.0"
-	@echo "  make release IMAGE_TAG=0.2.0"
+	@echo "  make release VERSION=0.2.0"
+	@echo ""
+	@echo "Quick Release:"
+	@echo "  ./release.sh 0.1.0         # Recommended"
+	@echo "  make release VERSION=0.1.0 # Alternative"

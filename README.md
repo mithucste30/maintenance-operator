@@ -52,14 +52,14 @@ Using OCI registry (Helm 3.8+):
 ```bash
 # Install specific version
 helm install maintenance-operator \
-  oci://ghcr.io/mithucste30/maintenance-operator/charts/maintenance-operator \
+  oci://ghcr.io/mithucste30/charts/maintenance-operator \
   --version 0.1.0 \
   --namespace maintenance-operator \
   --create-namespace
 
 # Install latest version
 helm install maintenance-operator \
-  oci://ghcr.io/mithucste30/maintenance-operator/charts/maintenance-operator \
+  oci://ghcr.io/mithucste30/charts/maintenance-operator \
   --namespace maintenance-operator \
   --create-namespace
 ```

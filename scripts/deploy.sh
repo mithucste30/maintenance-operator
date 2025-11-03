@@ -79,15 +79,44 @@ if [ "$VERSION" = "latest" ]; then
     fi
 fi
 
+# Detect if we're in the chart directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CHART_DIR="$(dirname "$SCRIPT_DIR")"
+LOCAL_CHART_AVAILABLE=false
+
+if [ -f "$CHART_DIR/Chart.yaml" ]; then
+    LOCAL_CHART_AVAILABLE=true
+fi
+
 # Install using Helm
 echo ""
 echo -e "${YELLOW}Installing Maintenance Operator...${NC}"
 
-if [ "$INSTALL_METHOD" = "oci" ]; then
-    echo -e "${BLUE}Using OCI registry: ghcr.io${NC}"
+# Check if version looks like a branch name (main, develop, etc.)
+if [[ "$VERSION" =~ ^(main|develop|master|dev)$ ]]; then
+    # For branch names, try local chart first if available
+    if [ "$LOCAL_CHART_AVAILABLE" = true ]; then
+        echo -e "${BLUE}Using local chart (branch: $VERSION)${NC}"
+        helm upgrade --install maintenance-operator \
+            "$CHART_DIR" \
+            --namespace "$NAMESPACE" \
+            --create-namespace \
+            --wait \
+            --timeout 5m \
+            --set image.repository=ghcr.io/${GITHUB_REPO} \
+            --set image.tag="$VERSION"
+        INSTALL_SUCCESS=true
+    else
+        echo -e "${RED}Error: Local chart not found and no release exists for branch name '$VERSION'${NC}"
+        echo -e "${YELLOW}Hint: Run this script from the repository directory, or use a version tag like '0.1.0'${NC}"
+        exit 1
+    fi
+else
+    # For version tags, try OCI registry first
+    INSTALL_SUCCESS=false
 
-    # Try OCI registry first
-    if helm pull oci://ghcr.io/${GITHUB_REPO}/charts/maintenance-operator --version "$VERSION" &> /dev/null; then
+    echo -e "${BLUE}Trying OCI registry: ghcr.io${NC}"
+    if helm pull oci://ghcr.io/${GITHUB_REPO}/charts/maintenance-operator --version "$VERSION" --destination /tmp &> /dev/null; then
         helm upgrade --install maintenance-operator \
             oci://ghcr.io/${GITHUB_REPO}/charts/maintenance-operator \
             --version "$VERSION" \
@@ -97,30 +126,54 @@ if [ "$INSTALL_METHOD" = "oci" ]; then
             --timeout 5m \
             --set image.repository=ghcr.io/${GITHUB_REPO} \
             --set image.tag="$VERSION"
+        INSTALL_SUCCESS=true
     else
         echo -e "${YELLOW}OCI registry not available, trying GitHub releases...${NC}"
         CHART_URL="https://github.com/$GITHUB_REPO/releases/download/v${VERSION}/maintenance-operator-${VERSION}.tgz"
 
-        helm upgrade --install maintenance-operator \
-            "$CHART_URL" \
-            --namespace "$NAMESPACE" \
-            --create-namespace \
-            --wait \
-            --timeout 5m \
-            --set image.repository=ghcr.io/${GITHUB_REPO} \
-            --set image.tag="$VERSION"
-    fi
-else
-    echo -e "${BLUE}Using GitHub release: $CHART_URL${NC}"
+        if curl -fsSL -I "$CHART_URL" &> /dev/null; then
+            helm upgrade --install maintenance-operator \
+                "$CHART_URL" \
+                --namespace "$NAMESPACE" \
+                --create-namespace \
+                --wait \
+                --timeout 5m \
+                --set image.repository=ghcr.io/${GITHUB_REPO} \
+                --set image.tag="$VERSION"
+            INSTALL_SUCCESS=true
+        else
+            echo -e "${YELLOW}GitHub release not found, trying local chart...${NC}"
 
-    helm upgrade --install maintenance-operator \
-        "$CHART_URL" \
-        --namespace "$NAMESPACE" \
-        --create-namespace \
-        --wait \
-        --timeout 5m \
-        --set image.repository=ghcr.io/${GITHUB_REPO} \
-        --set image.tag="$VERSION"
+            if [ "$LOCAL_CHART_AVAILABLE" = true ]; then
+                echo -e "${BLUE}Using local chart${NC}"
+                helm upgrade --install maintenance-operator \
+                    "$CHART_DIR" \
+                    --namespace "$NAMESPACE" \
+                    --create-namespace \
+                    --wait \
+                    --timeout 5m \
+                    --set image.repository=ghcr.io/${GITHUB_REPO} \
+                    --set image.tag="$VERSION"
+                INSTALL_SUCCESS=true
+            else
+                echo -e "${RED}Error: Could not find chart from any source${NC}"
+                echo -e "${YELLOW}Tried:${NC}"
+                echo -e "  1. OCI registry: oci://ghcr.io/${GITHUB_REPO}/charts/maintenance-operator"
+                echo -e "  2. GitHub release: $CHART_URL"
+                echo -e "  3. Local chart: Not available"
+                echo ""
+                echo -e "${YELLOW}Suggestions:${NC}"
+                echo -e "  - Create a release: cd <repo> && ./scripts/create-release.sh $VERSION"
+                echo -e "  - Run from repo directory to use local chart"
+                exit 1
+            fi
+        fi
+    fi
+fi
+
+if [ "$INSTALL_SUCCESS" != true ]; then
+    echo -e "${RED}Installation failed${NC}"
+    exit 1
 fi
 
 echo ""
