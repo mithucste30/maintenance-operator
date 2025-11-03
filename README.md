@@ -14,11 +14,23 @@ A Kubernetes operator that manages maintenance mode for Ingress and IngressRoute
 - **Automatic maintenance mode**: Simply add an annotation to enable maintenance
 - **Works with standard Ingress and Traefik IngressRoute** resources
 - **Multiple content types**: Serves HTML, JSON, and XML based on client Accept headers
-- **Custom maintenance pages**: Configure different pages for different services
+- **Custom maintenance pages**: Configure different pages for different services (IngressRoute only)
 - **Automatic backup and restore**: Original service configuration is stored and restored automatically
 - **Proper HTTP status codes**: Returns 503 Service Unavailable by default
 - **Zero downtime**: Seamlessly switches between normal and maintenance mode
 - **Annotation-based configuration**: All settings managed through annotations
+
+## Feature Compatibility
+
+| Feature | Kubernetes Ingress | Traefik IngressRoute |
+|---------|-------------------|---------------------|
+| Enable/Disable Maintenance | ✅ Yes | ✅ Yes |
+| Default Maintenance Page | ✅ Yes | ✅ Yes |
+| Custom Maintenance Pages | ❌ No* | ✅ Yes |
+| Content Negotiation | ✅ Yes | ✅ Yes |
+| Cross-namespace Support | ✅ Yes | ✅ Yes |
+
+*Custom pages require Traefik Middleware to inject the page selection header. Standard Ingress will always use the default maintenance page.
 
 ## How It Works
 
@@ -152,6 +164,8 @@ kubectl annotate ingressroute my-app maintenance-operator.kahf.io/enabled-
 
 You can configure custom maintenance pages in the `values.yaml`.
 
+**Note:** Custom pages currently work with **Traefik IngressRoute** only. For standard Kubernetes Ingress, the default maintenance page will always be used. This is because custom pages require Traefik Middleware to inject the page selection header.
+
 #### Step 1: Add to values.yaml
 
 ```yaml
@@ -187,17 +201,17 @@ maintenance:
 # Upgrade the Helm release
 helm upgrade maintenance-operator . -n maintenance-operator
 
-# Enable maintenance with custom page
-kubectl annotate ingress my-app \
+# Enable maintenance with custom page (IngressRoute only)
+kubectl annotate ingressroute my-app \
   maintenance-operator.kahf.io/enabled=true \
   maintenance-operator.kahf.io/custom-page=my-app
 ```
 
-#### Switch to default page
+#### Switch to default page (IngressRoute only)
 
 ```bash
 # Use "default" value or remove the annotation
-kubectl annotate ingress my-app \
+kubectl annotate ingressroute my-app \
   maintenance-operator.kahf.io/custom-page=default --overwrite
 ```
 
