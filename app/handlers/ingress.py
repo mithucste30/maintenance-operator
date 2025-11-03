@@ -14,8 +14,8 @@ from utils import (
     create_backup_configmap,
     get_backup_configmap,
     delete_backup_configmap,
-    create_maintenance_service,
-    delete_maintenance_service,
+    create_maintenance_resources,
+    delete_maintenance_resources,
     BACKUP_ANNOTATION,
     CUSTOM_PAGE_ANNOTATION,
     MAINTENANCE_SERVICE_PORT,
@@ -50,20 +50,18 @@ def handle_ingress(spec, name, namespace, annotations, old, new, **kwargs):
         if annotations and CUSTOM_PAGE_ANNOTATION in annotations:
             custom_page = annotations[CUSTOM_PAGE_ANNOTATION]
 
-        # Create proxy service with endpoints in target namespace (for cross-namespace support)
-        # Pass custom_page to store in service annotations
-        proxy_service_name = create_maintenance_service(namespace, custom_page)
+        # Create maintenance resources (ConfigMap + Pod + Service) in target namespace
+        maintenance_service_name = create_maintenance_resources(namespace, name, custom_page)
 
-        # Update Ingress to point to maintenance proxy service (same namespace)
+        # Update Ingress to point to maintenance service (same namespace)
         new_backend = client.V1IngressBackend(
             service=client.V1IngressServiceBackend(
-                name=proxy_service_name,
+                name=maintenance_service_name,
                 port=client.V1ServiceBackendPort(number=MAINTENANCE_SERVICE_PORT)
             )
         )
 
         # Update all rules to point to maintenance service
-        # For custom pages, we'll use path rewrite to include query parameter
         new_rules = []
         if spec.get('rules'):
             for rule in spec['rules']:
@@ -75,29 +73,21 @@ def handle_ingress(spec, name, namespace, annotations, old, new, **kwargs):
                     # Point to maintenance service
                     new_path['backend'] = {
                         'service': {
-                            'name': proxy_service_name,
+                            'name': maintenance_service_name,
                             'port': {'number': MAINTENANCE_SERVICE_PORT}
                         }
                     }
-                    # Note: Custom page is stored in service annotations and will be
-                    # read by the maintenance server via query param or header
-                    # Most ingress controllers preserve query parameters
                     new_paths.append(new_path)
 
                 new_rule = rule.copy()
                 new_rule['http'] = {'paths': new_paths}
                 new_rules.append(new_rule)
 
-        # Prepare annotations - add rewrite annotation for custom pages
+        # Prepare annotations
         new_annotations = dict(annotations or {})
         new_annotations[BACKUP_ANNOTATION] = 'true'
-
-        # If custom page is specified, add custom header annotation
-        # This works with Traefik Ingress controller to inject the X-Maintenance-Page header
-        if custom_page and custom_page.lower() != 'default':
-            # Traefik custom request headers annotation
-            new_annotations['traefik.ingress.kubernetes.io/custom-request-headers'] = f'X-Maintenance-Page:{custom_page}'
-            logger.info(f"Added custom header annotation for custom page: {custom_page}")
+        # Store the maintenance service name for later cleanup
+        new_annotations['maintenance-operator.kahf.io/service-name'] = maintenance_service_name
 
         # Patch the Ingress
         ingress_patch = {
@@ -129,27 +119,56 @@ def handle_ingress(spec, name, namespace, annotations, old, new, **kwargs):
         if current_custom_page != old_custom_page:
             logger.info(f"Custom page annotation changed from '{old_custom_page}' to '{current_custom_page}'")
 
-            # Update service annotations with new custom page
-            # Note: We should recreate the service with new annotations, but for now just update annotations
+            # Get old service name
+            old_service_name = old_annotations.get('maintenance-operator.kahf.io/service-name', '')
 
-            # Prepare new annotations with updated custom header
+            # Remove reference from old maintenance resources
+            if old_service_name:
+                delete_maintenance_resources(namespace, name, old_service_name)
+
+            # Create new maintenance resources with new custom page
+            new_service_name = create_maintenance_resources(namespace, name, current_custom_page)
+
+            # Update Ingress to point to new service
+            new_backend = client.V1IngressBackend(
+                service=client.V1IngressServiceBackend(
+                    name=new_service_name,
+                    port=client.V1ServiceBackendPort(number=MAINTENANCE_SERVICE_PORT)
+                )
+            )
+
+            # Update all rules to point to new maintenance service
+            new_rules = []
+            if spec.get('rules'):
+                for rule in spec['rules']:
+                    http = rule.get('http', {})
+                    paths = http.get('paths', [])
+                    new_paths = []
+                    for path in paths:
+                        new_path = path.copy()
+                        new_path['backend'] = {
+                            'service': {
+                                'name': new_service_name,
+                                'port': {'number': MAINTENANCE_SERVICE_PORT}
+                            }
+                        }
+                        new_paths.append(new_path)
+
+                    new_rule = rule.copy()
+                    new_rule['http'] = {'paths': new_paths}
+                    new_rules.append(new_rule)
+
+            # Update annotations
             new_annotations = dict(annotations or {})
+            new_annotations['maintenance-operator.kahf.io/service-name'] = new_service_name
 
-            # Remove old custom header annotation
-            new_annotations.pop('traefik.ingress.kubernetes.io/custom-request-headers', None)
-
-            # Add new custom header annotation if custom page is specified
-            if current_custom_page and current_custom_page.lower() != 'default':
-                # Traefik custom request headers annotation
-                new_annotations['traefik.ingress.kubernetes.io/custom-request-headers'] = f'X-Maintenance-Page:{current_custom_page}'
-                logger.info(f"Updated custom header annotation for custom page: {current_custom_page}")
-            else:
-                logger.info(f"Removed custom header annotation (using default page)")
-
-            # Patch the Ingress with updated annotations
+            # Patch the Ingress
             ingress_patch = {
                 'metadata': {
                     'annotations': new_annotations
+                },
+                'spec': {
+                    'rules': new_rules if new_rules else spec.get('rules')
                 }
             }
 
@@ -162,6 +181,9 @@ def handle_ingress(spec, name, namespace, annotations, old, new, **kwargs):
 
         backup_data = get_backup_configmap(name, namespace)
         if backup_data:
+            # Get service name for cleanup
+            service_name = annotations.get('maintenance-operator.kahf.io/service-name', '')
+
             # Restore original configuration
             ingress_patch = {
                 'spec': {
@@ -170,10 +192,11 @@ def handle_ingress(spec, name, namespace, annotations, old, new, **kwargs):
                 }
             }
 
-            # Remove backup annotation
+            # Remove backup and service name annotations
             if annotations:
                 new_annotations = dict(annotations)
                 new_annotations.pop(BACKUP_ANNOTATION, None)
+                new_annotations.pop('maintenance-operator.kahf.io/service-name', None)
                 ingress_patch['metadata'] = {'annotations': new_annotations}
 
             networking_v1.patch_namespaced_ingress(name, namespace, ingress_patch)
@@ -181,7 +204,8 @@ def handle_ingress(spec, name, namespace, annotations, old, new, **kwargs):
             # Delete backup ConfigMap
             delete_backup_configmap(name, namespace)
 
-            # Delete the proxy service
-            delete_maintenance_service(namespace)
+            # Delete or cleanup maintenance resources
+            if service_name:
+                delete_maintenance_resources(namespace, name, service_name)
 
             logger.info(f"Maintenance mode disabled for Ingress {namespace}/{name}")

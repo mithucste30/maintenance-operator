@@ -14,8 +14,10 @@ with patch('kubernetes.config.load_incluster_config'), \
         create_backup_configmap,
         get_backup_configmap,
         delete_backup_configmap,
-        create_maintenance_service,
-        delete_maintenance_service,
+        create_maintenance_resources,
+        delete_maintenance_resources,
+        get_html_content,
+        hash_content,
     )
 
 
@@ -108,47 +110,86 @@ class TestBackupConfigMap:
         assert call_args[0][1] == namespace
 
 
-class TestMaintenanceService:
-    """Test maintenance service management"""
+class TestMaintenanceResources:
+    """Test maintenance resource management"""
+
+    def test_hash_content(self):
+        """Test content hashing generates consistent hash"""
+        content1 = "<html>Test</html>"
+        content2 = "<html>Test</html>"
+        content3 = "<html>Different</html>"
+
+        hash1 = hash_content(content1)
+        hash2 = hash_content(content2)
+        hash3 = hash_content(content3)
+
+        # Same content should generate same hash
+        assert hash1 == hash2
+        # Different content should generate different hash
+        assert hash1 != hash3
+        # Hash should be 8 characters
+        assert len(hash1) == 8
 
     @patch('utils.v1')
-    @patch('utils.get_maintenance_pod_ips')
-    def test_create_maintenance_service(self, mock_get_ips, mock_v1):
-        """Test creating maintenance proxy service"""
+    @patch('utils.get_html_content')
+    def test_create_maintenance_resources(self, mock_get_html, mock_v1):
+        """Test creating maintenance resources (ConfigMap + Pod + Service)"""
         namespace = "default"
-        mock_get_ips.return_value = ["10.1.2.3"]
+        ingress_name = "test-ingress"
+        custom_page = "my-page"
 
-        service_name = create_maintenance_service(namespace)
+        mock_get_html.return_value = "<html>Maintenance Page</html>"
+        mock_v1.read_namespaced_config_map.side_effect = Exception("Not found")
 
-        assert "maintenance-operator-proxy" in service_name
-        # Verify service was created
-        mock_v1.create_namespaced_service.assert_called_once()
-        # Verify endpoints were created
-        mock_v1.create_namespaced_endpoints.assert_called_once()
+        service_name = create_maintenance_resources(namespace, ingress_name, custom_page)
+
+        # Verify service name follows pattern
+        assert service_name.startswith("maintenance-")
+        # Verify ConfigMap, Pod, and Service were created
+        assert mock_v1.create_namespaced_config_map.called
+        assert mock_v1.create_namespaced_pod.called
+        assert mock_v1.create_namespaced_service.called
 
     @patch('utils.v1')
-    def test_create_maintenance_service_already_exists(self, mock_v1):
-        """Test creating service when it already exists (should update)"""
-        from kubernetes.client.rest import ApiException
-
+    def test_delete_maintenance_resources_no_refs(self, mock_v1):
+        """Test deleting maintenance resources when no more references"""
         namespace = "default"
-        mock_v1.create_namespaced_service.side_effect = ApiException(status=409)
+        ingress_name = "test-ingress"
+        service_name = "maintenance-abc123"
 
-        # Should not raise exception
-        service_name = create_maintenance_service(namespace)
+        mock_configmap = Mock()
+        mock_configmap.metadata.annotations = {
+            'maintenance-operator.kahf.io/used-by': ingress_name
+        }
+        mock_v1.read_namespaced_config_map.return_value = mock_configmap
 
-        assert "maintenance-operator-proxy" in service_name
+        delete_maintenance_resources(namespace, ingress_name, service_name)
 
-    @patch('utils.v1')
-    def test_delete_maintenance_service(self, mock_v1):
-        """Test deleting maintenance proxy service"""
-        namespace = "default"
-
-        delete_maintenance_service(namespace)
-
-        # Should attempt to delete both service and endpoints
+        # Should delete all resources when no more references
+        assert mock_v1.delete_namespaced_pod.called
         assert mock_v1.delete_namespaced_service.called
-        assert mock_v1.delete_namespaced_endpoints.called
+        assert mock_v1.delete_namespaced_config_map.called
+
+    @patch('utils.v1')
+    def test_delete_maintenance_resources_with_refs(self, mock_v1):
+        """Test deleting maintenance resources when other ingresses still use them"""
+        namespace = "default"
+        ingress_name = "test-ingress-1"
+        service_name = "maintenance-abc123"
+
+        mock_configmap = Mock()
+        mock_configmap.metadata.annotations = {
+            'maintenance-operator.kahf.io/used-by': 'test-ingress-1,test-ingress-2'
+        }
+        mock_v1.read_namespaced_config_map.return_value = mock_configmap
+
+        delete_maintenance_resources(namespace, ingress_name, service_name)
+
+        # Should only update ConfigMap, not delete resources
+        assert mock_v1.patch_namespaced_config_map.called
+        assert not mock_v1.delete_namespaced_pod.called
+        assert not mock_v1.delete_namespaced_service.called
+        assert not mock_v1.delete_namespaced_config_map.called
 
 
 class TestHandlerLogic:

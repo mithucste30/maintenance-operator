@@ -50,61 +50,10 @@ spec:
               value: {{ .Values.operator.customPageAnnotation | quote }}
             - name: BACKUP_CONFIGMAP_PREFIX
               value: {{ .Values.operator.backupConfigMapPrefix | quote }}
-            - name: MAINTENANCE_SERVICE_NAME
-              value: {{ include "maintenance-operator.fullname" . | quote }}
+            - name: MAINTENANCE_CONFIGMAP_NAME
+              value: {{ include "maintenance-operator.fullname" . }}-default-pages
             - name: MAINTENANCE_SERVICE_PORT
-              value: {{ .Values.service.port | quote }}
-          resources:
-            {{- toYaml .Values.resources | nindent 12 }}
-          volumeMounts:
-            - name: tmp
-              mountPath: /tmp
-
-        # Maintenance page server
-        - name: server
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["python", "/app/maintenance_server.py"]
-          ports:
-            - name: http
-              containerPort: {{ .Values.service.targetPort }}
-              protocol: TCP
-          env:
-            - name: POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-            - name: HTTP_STATUS_CODE
-              value: {{ .Values.maintenance.httpStatusCode | quote }}
-            - name: DEFAULT_HTML
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "maintenance-operator.fullname" . }}-default-pages
-                  key: page.html
-            - name: DEFAULT_JSON
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "maintenance-operator.fullname" . }}-default-pages
-                  key: page.json
-            - name: DEFAULT_XML
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "maintenance-operator.fullname" . }}-default-pages
-                  key: page.xml
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 30
-          readinessProbe:
-            httpGet:
-              path: /ready
-              port: http
-            initialDelaySeconds: 5
-            periodSeconds: 10
+              value: "80"
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:

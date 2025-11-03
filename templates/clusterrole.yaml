@@ -20,30 +20,20 @@ rules:
     resources: ["ingressroutes"]
     verbs: ["get", "list", "watch", "patch", "update"]
 
-  # Middleware (Traefik) permissions for custom page headers
-  - apiGroups: ["traefik.io", "traefik.containo.us"]
-    resources: ["middlewares"]
-    verbs: ["get", "list", "create", "update", "patch", "delete"]
-
-  # ConfigMap permissions (for backups and custom pages)
+  # ConfigMap permissions (for backups and maintenance page content)
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
-  # Service permissions (to manage proxy services for cross-namespace support)
+  # Service permissions (to create maintenance services per namespace)
   - apiGroups: [""]
     resources: ["services"]
     verbs: ["get", "list", "create", "update", "patch", "delete"]
 
-  # Endpoints permissions (for managing service endpoints)
-  - apiGroups: [""]
-    resources: ["endpoints"]
-    verbs: ["get", "list", "create", "update", "patch", "delete"]
-
-  # Pod permissions (to get maintenance operator pod IPs)
+  # Pod permissions (to create maintenance pods per namespace)
   - apiGroups: [""]
     resources: ["pods"]
-    verbs: ["get", "list"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
 
   # Events permissions (for logging)
   - apiGroups: [""]

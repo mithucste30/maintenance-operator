@@ -13,8 +13,8 @@ from utils import (
     create_backup_configmap,
     get_backup_configmap,
     delete_backup_configmap,
-    create_maintenance_service,
-    delete_maintenance_service,
+    create_maintenance_resources,
+    delete_maintenance_resources,
     BACKUP_ANNOTATION,
     CUSTOM_PAGE_ANNOTATION,
     MAINTENANCE_SERVICE_PORT,
@@ -47,92 +47,19 @@ def handle_ingressroute(spec, name, namespace, meta, old, new, **kwargs):
         # Get custom page name if specified
         custom_page = annotations.get(CUSTOM_PAGE_ANNOTATION, '').strip()
 
-        # Create proxy service with endpoints in target namespace (for Traefik cross-namespace restriction)
-        # Pass custom_page to store in service annotations (fallback for when middleware isn't used)
-        proxy_service_name = create_maintenance_service(namespace, custom_page)
+        # Create maintenance resources (ConfigMap + Pod + Service) in target namespace
+        maintenance_service_name = create_maintenance_resources(namespace, name, custom_page)
 
-        # Always try to clean up any existing middleware first (in case we're switching pages)
-        potential_middleware_name = f"{name}-maintenance-page"
-        try:
-            custom_api.delete_namespaced_custom_object(
-                group='traefik.io',
-                version='v1alpha1',
-                namespace=namespace,
-                plural='middlewares',
-                name=potential_middleware_name
-            )
-            logger.info(f"Deleted existing middleware {potential_middleware_name}")
-        except ApiException as e:
-            if e.status != 404:
-                logger.warning(f"Error deleting existing middleware: {e}")
-            # 404 is fine - middleware doesn't exist
-
-        # Create middleware to inject custom page header if specified
-        # Only create if custom_page is set and not "default"
-        middleware_name = None
-        if custom_page and custom_page.lower() != 'default':
-            middleware_name = f"{name}-maintenance-page"
-            middleware = {
-                'apiVersion': 'traefik.io/v1alpha1',
-                'kind': 'Middleware',
-                'metadata': {
-                    'name': middleware_name,
-                    'namespace': namespace,
-                    'labels': {'app': 'maintenance-operator', 'managed-by': 'maintenance-operator'}
-                },
-                'spec': {
-                    'headers': {
-                        'customRequestHeaders': {
-                            'X-Maintenance-Page': custom_page
-                        }
-                    }
-                }
-            }
-            try:
-                custom_api.create_namespaced_custom_object(
-                    group='traefik.io',
-                    version='v1alpha1',
-                    namespace=namespace,
-                    plural='middlewares',
-                    body=middleware
-                )
-                logger.info(f"Created middleware {middleware_name} for custom page {custom_page}")
-            except ApiException as e:
-                if e.status == 409:
-                    custom_api.patch_namespaced_custom_object(
-                        group='traefik.io',
-                        version='v1alpha1',
-                        namespace=namespace,
-                        plural='middlewares',
-                        name=middleware_name,
-                        body=middleware
-                    )
-                    logger.info(f"Updated middleware {middleware_name} for custom page {custom_page}")
-                else:
-                    raise
-
-        # Update IngressRoute to point to maintenance proxy service (same namespace, no namespace field)
+        # Update IngressRoute to point to maintenance service (same namespace)
         new_routes = []
         if spec.get('routes'):
             for route in spec['routes']:
                 new_route = route.copy()
-                # Replace all services with maintenance proxy service (same namespace)
+                # Replace all services with maintenance service (same namespace)
                 new_route['services'] = [{
-                    'name': proxy_service_name,
+                    'name': maintenance_service_name,
                     'port': MAINTENANCE_SERVICE_PORT
                 }]
-                # Remove our maintenance page middleware if it exists (in case we're switching pages)
-                existing_middlewares = new_route.get('middlewares', [])
-                filtered_middlewares = [
-                    mw for mw in existing_middlewares
-                    if mw.get('name') != potential_middleware_name
-                ]
-                # Add custom page middleware if specified (at the beginning)
-                if middleware_name:
-                    new_route['middlewares'] = [{'name': middleware_name}] + filtered_middlewares
-                else:
-                    # No custom page - use filtered middlewares without our maintenance middleware
-                    new_route['middlewares'] = filtered_middlewares
                 new_routes.append(new_route)
 
         # Patch the IngressRoute
@@ -140,7 +67,8 @@ def handle_ingressroute(spec, name, namespace, meta, old, new, **kwargs):
             'metadata': {
                 'annotations': {
                     **annotations,
-                    BACKUP_ANNOTATION: 'true'
+                    BACKUP_ANNOTATION: 'true',
+                    'maintenance-operator.kahf.io/service-name': maintenance_service_name
                 }
             },
             'spec': {
@@ -174,73 +102,35 @@ def handle_ingressroute(spec, name, namespace, meta, old, new, **kwargs):
         if current_custom_page != old_custom_page:
             logger.info(f"Custom page annotation changed from '{old_custom_page}' to '{current_custom_page}'")
 
-            # Get current routes from spec
-            current_routes = spec.get('routes', [])
+            # Get old service name
+            old_service_name = old_annotations.get('maintenance-operator.kahf.io/service-name', '')
 
-            # Clean up existing middleware
-            potential_middleware_name = f"{name}-maintenance-page"
-            try:
-                custom_api.delete_namespaced_custom_object(
-                    group='traefik.io',
-                    version='v1alpha1',
-                    namespace=namespace,
-                    plural='middlewares',
-                    name=potential_middleware_name
-                )
-                logger.info(f"Deleted existing middleware {potential_middleware_name}")
-            except ApiException as e:
-                if e.status != 404:
-                    logger.warning(f"Error deleting existing middleware: {e}")
+            # Remove reference from old maintenance resources
+            if old_service_name:
+                delete_maintenance_resources(namespace, name, old_service_name)
 
-            # Create new middleware if needed
-            middleware_name = None
-            if current_custom_page and current_custom_page.lower() != 'default':
-                middleware_name = f"{name}-maintenance-page"
-                middleware = {
-                    'apiVersion': 'traefik.io/v1alpha1',
-                    'kind': 'Middleware',
-                    'metadata': {
-                        'name': middleware_name,
-                        'namespace': namespace,
-                        'labels': {'app': 'maintenance-operator', 'managed-by': 'maintenance-operator'}
-                    },
-                    'spec': {
-                        'headers': {
-                            'customRequestHeaders': {
-                                'X-Maintenance-Page': current_custom_page
-                            }
-                        }
-                    }
-                }
-                custom_api.create_namespaced_custom_object(
-                    group='traefik.io',
-                    version='v1alpha1',
-                    namespace=namespace,
-                    plural='middlewares',
-                    body=middleware
-                )
-                logger.info(f"Created new middleware {middleware_name} for custom page {current_custom_page}")
+            # Create new maintenance resources with new custom page
+            new_service_name = create_maintenance_resources(namespace, name, current_custom_page)
 
-            # Update routes with new middleware configuration
+            # Update routes to point to new service
             new_routes = []
-            for route in current_routes:
-                new_route = route.copy()
-                # Remove our maintenance page middleware if it exists
-                existing_middlewares = new_route.get('middlewares', [])
-                filtered_middlewares = [
-                    mw for mw in existing_middlewares
-                    if mw.get('name') != potential_middleware_name
-                ]
-                # Add custom page middleware if specified (at the beginning)
-                if middleware_name:
-                    new_route['middlewares'] = [{'name': middleware_name}] + filtered_middlewares
-                else:
-                    # No custom page - use filtered middlewares without our maintenance middleware
-                    new_route['middlewares'] = filtered_middlewares
-                new_routes.append(new_route)
+            if spec.get('routes'):
+                for route in spec['routes']:
+                    new_route = route.copy()
+                    new_route['services'] = [{
+                        'name': new_service_name,
+                        'port': MAINTENANCE_SERVICE_PORT
+                    }]
+                    new_routes.append(new_route)
 
-            # Patch the IngressRoute with updated routes
+            # Patch the IngressRoute
             patch = {
+                'metadata': {
+                    'annotations': {
+                        **annotations,
+                        'maintenance-operator.kahf.io/service-name': new_service_name
+                    }
+                },
                 'spec': {
                     'routes': new_routes
                 }
@@ -262,9 +152,13 @@ def handle_ingressroute(spec, name, namespace, meta, old, new, **kwargs):
 
         backup_data = get_backup_configmap(name, namespace)
         if backup_data:
+            # Get service name for cleanup
+            service_name = annotations.get('maintenance-operator.kahf.io/service-name', '')
+
             # Restore original configuration
             new_annotations = dict(annotations)
             new_annotations.pop(BACKUP_ANNOTATION, None)
+            new_annotations.pop('maintenance-operator.kahf.io/service-name', None)
 
             patch = {
                 'metadata': {
@@ -287,22 +181,8 @@ def handle_ingressroute(spec, name, namespace, meta, old, new, **kwargs):
             # Delete backup ConfigMap
             delete_backup_configmap(name, namespace)
 
-            # Delete the proxy service
-            delete_maintenance_service(namespace)
-
-            # Delete custom page middleware if it exists
-            middleware_name = f"{name}-maintenance-page"
-            try:
-                custom_api.delete_namespaced_custom_object(
-                    group='traefik.io',
-                    version='v1alpha1',
-                    namespace=namespace,
-                    plural='middlewares',
-                    name=middleware_name
-                )
-                logger.info(f"Deleted middleware {middleware_name}")
-            except ApiException as e:
-                if e.status != 404:
-                    logger.error(f"Error deleting middleware: {e}")
+            # Delete or cleanup maintenance resources
+            if service_name:
+                delete_maintenance_resources(namespace, name, service_name)
 
             logger.info(f"Maintenance mode disabled for IngressRoute {namespace}/{name}")
