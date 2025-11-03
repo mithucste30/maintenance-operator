@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 @kopf.on.create('networking.k8s.io', 'v1', 'ingresses')
 @kopf.on.update('networking.k8s.io', 'v1', 'ingresses')
-def handle_ingress(spec, name, namespace, annotations, **kwargs):
+def handle_ingress(spec, name, namespace, annotations, old, new, **kwargs):
     """Handle Ingress resources"""
     logger.info(f"Processing Ingress {namespace}/{name}")
 
@@ -92,15 +92,12 @@ def handle_ingress(spec, name, namespace, annotations, **kwargs):
         new_annotations = dict(annotations or {})
         new_annotations[BACKUP_ANNOTATION] = 'true'
 
-        # If custom page is specified, add rewrite annotation for query parameter
-        # This works with most ingress controllers (nginx, traefik)
+        # If custom page is specified, add custom header annotation
+        # This works with Traefik Ingress controller to inject the X-Maintenance-Page header
         if custom_page and custom_page.lower() != 'default':
-            # Add nginx-style rewrite annotation (most common)
-            new_annotations['nginx.ingress.kubernetes.io/configuration-snippet'] = f'rewrite ^(.*)$ $1?page={custom_page} break;'
-            # Add traefik-style annotation
-            new_annotations['traefik.ingress.kubernetes.io/redirect-regex'] = f'^(.*)$'
-            new_annotations['traefik.ingress.kubernetes.io/redirect-replacement'] = f'$1?page={custom_page}'
-            logger.info(f"Added rewrite annotations for custom page: {custom_page}")
+            # Traefik custom request headers annotation
+            new_annotations['traefik.ingress.kubernetes.io/custom-request-headers'] = f'X-Maintenance-Page:{custom_page}'
+            logger.info(f"Added custom header annotation for custom page: {custom_page}")
 
         # Patch the Ingress
         ingress_patch = {
@@ -115,6 +112,49 @@ def handle_ingress(spec, name, namespace, annotations, **kwargs):
 
         networking_v1.patch_namespaced_ingress(name, namespace, ingress_patch)
         logger.info(f"Maintenance mode enabled for Ingress {namespace}/{name}")
+
+    elif under_maintenance and has_backup:
+        # Already in maintenance mode - check if custom page annotation changed
+        logger.info(f"Ingress {namespace}/{name} already in maintenance mode, checking for annotation changes")
+
+        # Get the current and old custom page annotations
+        current_custom_page = annotations.get(CUSTOM_PAGE_ANNOTATION, '').strip()
+
+        old_annotations = {}
+        if old:
+            old_annotations = old.get('metadata', {}).get('annotations', {})
+        old_custom_page = old_annotations.get(CUSTOM_PAGE_ANNOTATION, '').strip()
+
+        # Check if the custom page annotation changed
+        if current_custom_page != old_custom_page:
+            logger.info(f"Custom page annotation changed from '{old_custom_page}' to '{current_custom_page}'")
+
+            # Update service annotations with new custom page
+            # Note: We should recreate the service with new annotations, but for now just update annotations
+
+            # Prepare new annotations with updated custom header
+            new_annotations = dict(annotations or {})
+
+            # Remove old custom header annotation
+            new_annotations.pop('traefik.ingress.kubernetes.io/custom-request-headers', None)
+
+            # Add new custom header annotation if custom page is specified
+            if current_custom_page and current_custom_page.lower() != 'default':
+                # Traefik custom request headers annotation
+                new_annotations['traefik.ingress.kubernetes.io/custom-request-headers'] = f'X-Maintenance-Page:{current_custom_page}'
+                logger.info(f"Updated custom header annotation for custom page: {current_custom_page}")
+            else:
+                logger.info(f"Removed custom header annotation (using default page)")
+
+            # Patch the Ingress with updated annotations
+            ingress_patch = {
+                'metadata': {
+                    'annotations': new_annotations
+                }
+            }
+
+            networking_v1.patch_namespaced_ingress(name, namespace, ingress_patch)
+            logger.info(f"Updated Ingress {namespace}/{name} with new custom page configuration")
 
     elif not under_maintenance and has_backup:
         # Disable maintenance mode - restore original configuration
