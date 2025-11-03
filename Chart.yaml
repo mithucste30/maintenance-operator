@@ -2,8 +2,8 @@ apiVersion: v2
 name: maintenance-operator
 description: A Kubernetes operator that manages maintenance mode for Ingress and IngressRoute resources
 type: application
-version: 1.0.0
-appVersion: "1.0.0"
+version: 1.1.3
+appVersion: "1.1.3"
 keywords:
   - maintenance
   - operator
