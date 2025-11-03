@@ -3,7 +3,7 @@
 replicaCount: 1
 
 image:
-  repository: maintenance-operator
+  repository: ghcr.io/mithucste30/maintenance-operator
   pullPolicy: IfNotPresent
   tag: "0.1.1"
 
