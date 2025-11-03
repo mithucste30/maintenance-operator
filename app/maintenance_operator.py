@@ -21,14 +21,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configuration from environment
-MAINTENANCE_LABEL = os.getenv('MAINTENANCE_LABEL', 'under-maintenance')
-MAINTENANCE_LABEL_VALUE = os.getenv('MAINTENANCE_LABEL_VALUE', 'true')
+MAINTENANCE_ANNOTATION = os.getenv('MAINTENANCE_ANNOTATION', 'maintenance-operator.kahf.io/enabled')
+MAINTENANCE_ANNOTATION_VALUE = os.getenv('MAINTENANCE_ANNOTATION_VALUE', 'true')
 BACKUP_ANNOTATION = os.getenv('BACKUP_ANNOTATION', 'maintenance-operator.kahf.io/original-service')
 CUSTOM_PAGE_ANNOTATION = os.getenv('CUSTOM_PAGE_ANNOTATION', 'maintenance-operator.kahf.io/custom-page')
 BACKUP_CONFIGMAP_PREFIX = os.getenv('BACKUP_CONFIGMAP_PREFIX', 'maintenance-backup')
 MAINTENANCE_SERVICE_NAME = os.getenv('MAINTENANCE_SERVICE_NAME', 'maintenance-operator')
 MAINTENANCE_SERVICE_PORT = int(os.getenv('MAINTENANCE_SERVICE_PORT', '8080'))
 OPERATOR_NAMESPACE = os.getenv('POD_NAMESPACE', 'default')
+
+# Legacy label support (deprecated - use annotations instead)
+LEGACY_MAINTENANCE_LABEL = os.getenv('MAINTENANCE_LABEL', 'under-maintenance')
+LEGACY_MAINTENANCE_LABEL_VALUE = os.getenv('MAINTENANCE_LABEL_VALUE', 'true')
 
 # Load Kubernetes config
 try:
@@ -41,11 +45,18 @@ networking_v1 = client.NetworkingV1Api()
 custom_api = client.CustomObjectsApi()
 
 
-def is_under_maintenance(labels):
-    """Check if resource has maintenance label"""
-    if not labels:
-        return False
-    return labels.get(MAINTENANCE_LABEL) == MAINTENANCE_LABEL_VALUE
+def is_under_maintenance(annotations, labels=None):
+    """Check if resource is in maintenance mode via annotation (or legacy label for backward compatibility)"""
+    # Check annotation first (new standard)
+    if annotations and annotations.get(MAINTENANCE_ANNOTATION) == MAINTENANCE_ANNOTATION_VALUE:
+        return True
+
+    # Check legacy label for backward compatibility
+    if labels and labels.get(LEGACY_MAINTENANCE_LABEL) == LEGACY_MAINTENANCE_LABEL_VALUE:
+        logger.warning("Using legacy label for maintenance mode. Please migrate to annotation: maintenance-operator.kahf.io/enabled=true")
+        return True
+
+    return False
 
 
 def create_backup_configmap(name, namespace, backup_data):
@@ -211,7 +222,7 @@ def handle_ingress(spec, name, namespace, labels, annotations, **kwargs):
     """Handle Ingress resources"""
     logger.info(f"Processing Ingress {namespace}/{name}")
 
-    under_maintenance = is_under_maintenance(labels)
+    under_maintenance = is_under_maintenance(annotations, labels)
     has_backup = annotations and BACKUP_ANNOTATION in annotations
 
     if under_maintenance and not has_backup:
@@ -317,7 +328,7 @@ def handle_ingressroute(spec, name, namespace, labels, meta, old, new, **kwargs)
     logger.info(f"Processing IngressRoute {namespace}/{name}")
 
     annotations = meta.get('annotations', {})
-    under_maintenance = is_under_maintenance(labels)
+    under_maintenance = is_under_maintenance(annotations, labels)
     has_backup = BACKUP_ANNOTATION in annotations
 
     if under_maintenance and not has_backup:

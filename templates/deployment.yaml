@@ -40,10 +40,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-            - name: MAINTENANCE_LABEL
-              value: {{ .Values.operator.maintenanceLabel | quote }}
-            - name: MAINTENANCE_LABEL_VALUE
-              value: {{ .Values.operator.maintenanceLabelValue | quote }}
+            - name: MAINTENANCE_ANNOTATION
+              value: {{ .Values.operator.maintenanceAnnotation | quote }}
+            - name: MAINTENANCE_ANNOTATION_VALUE
+              value: {{ .Values.operator.maintenanceAnnotationValue | quote }}
             - name: BACKUP_ANNOTATION
               value: {{ .Values.operator.backupAnnotation | quote }}
             - name: CUSTOM_PAGE_ANNOTATION
@@ -54,6 +54,11 @@ spec:
               value: {{ include "maintenance-operator.fullname" . | quote }}
             - name: MAINTENANCE_SERVICE_PORT
               value: {{ .Values.service.port | quote }}
+            # Legacy label support (for backward compatibility)
+            - name: MAINTENANCE_LABEL
+              value: {{ .Values.operator.maintenanceLabel | default "under-maintenance" | quote }}
+            - name: MAINTENANCE_LABEL_VALUE
+              value: {{ .Values.operator.maintenanceLabelValue | default "true" | quote }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:

@@ -5,7 +5,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/mithucste30/maintenance-operator
   pullPolicy: IfNotPresent
-  tag: "0.2.2"
+  tag: "0.3.0"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -150,18 +150,22 @@ operator:
   # Namespaces to watch (empty means all namespaces)
   watchNamespaces: []
 
-  # Label to trigger maintenance mode
-  maintenanceLabel: "under-maintenance"
-  maintenanceLabelValue: "true"
-
-  # Annotation to store original service reference
-  backupAnnotation: "maintenance-operator.kahf.io/original-service"
+  # Annotation to enable maintenance mode (new standard)
+  maintenanceAnnotation: "maintenance-operator.kahf.io/enabled"
+  maintenanceAnnotationValue: "true"
 
   # Annotation to specify custom maintenance page
   customPageAnnotation: "maintenance-operator.kahf.io/custom-page"
 
-  # ConfigMap name prefix for storing backups
+  # Annotation to store original service reference (internal use)
+  backupAnnotation: "maintenance-operator.kahf.io/original-service"
+
+  # ConfigMap name prefix for storing backups (internal use)
   backupConfigMapPrefix: "maintenance-backup"
+
+  # Legacy label support (deprecated - use maintenanceAnnotation instead)
+  maintenanceLabel: "under-maintenance"
+  maintenanceLabelValue: "true"
 
 # Cluster-wide permissions (needed for watching IngressRoutes across namespaces)
 clusterRole:
