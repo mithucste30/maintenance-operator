@@ -1,0 +1,61 @@
+# Example values file with custom maintenance pages
+
+replicaCount: 1
+
+image:
+  repository: maintenance-operator
+  pullPolicy: IfNotPresent
+  tag: "0.1.0"
+
+# Custom maintenance pages for specific ingresses
+# NOTE: HTML must be base64 encoded - use scripts/encode-html.sh or scripts/encode-html.py
+maintenance:
+  httpStatusCode: 503
+
+  # Custom pages for different services
+  customPages:
+    # Example 1: Custom page for "api" service
+    api:
+      # Base64 encoded HTML (API maintenance page)
+      htmlBase64: "PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImVuIj4KPGhlYWQ+CiAgICA8bWV0YSBjaGFyc2V0PSJVVEYtOCI+CiAgICA8dGl0bGU+QVBJIFVuZGVyIE1haW50ZW5hbmNlPC90aXRsZT4KICAgIDxzdHlsZT4KICAgICAgICBib2R5IHsgZm9udC1mYW1pbHk6IEFyaWFsLCBzYW5zLXNlcmlmOyB0ZXh0LWFsaWduOiBjZW50ZXI7IHBhZGRpbmc6IDUwcHg7IH0KICAgICAgICBoMSB7IGNvbG9yOiAjZTc0YzNjOyB9CiAgICA8L3N0eWxlPgo8L2hlYWQ+Cjxib2R5PgogICAgPGgxPkFQSSBNYWludGVuYW5jZSBpbiBQcm9ncmVzczwvaDE+CiAgICA8cD5PdXIgQVBJIGlzIGN1cnJlbnRseSB1bmRlcmdvaW5nIHNjaGVkdWxlZCBtYWludGVuYW5jZS48L3A+CiAgICA8cD5FeHBlY3RlZCBjb21wbGV0aW9uOiAyIGhvdXJzPC9wPgo8L2JvZHk+CjwvaHRtbD4K"
+      json: |
+        {
+          "status": "maintenance",
+          "service": "api",
+          "message": "API is under maintenance",
+          "expectedCompletion": "2 hours",
+          "code": 503
+        }
+      xml: |
+        <?xml version="1.0" encoding="UTF-8"?>
+        <response>
+          <status>maintenance</status>
+          <service>api</service>
+          <message>API is under maintenance</message>
+          <expectedCompletion>2 hours</expectedCompletion>
+          <code>503</code>
+        </response>
+
+    # Example 2: Custom page for "web" application
+    web:
+      # Base64 encoded HTML (Web maintenance page with gradient background)
+      htmlBase64: "PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImVuIj4KPGhlYWQ+CiAgICA8bWV0YSBjaGFyc2V0PSJVVEYtOCI+CiAgICA8dGl0bGU+V2Vic2l0ZSBVbmRlciBNYWludGVuYW5jZTwvdGl0bGU+CiAgICA8c3R5bGU+CiAgICAgICAgYm9keSB7CiAgICAgICAgICAgIGZvbnQtZmFtaWx5OiAnU2Vnb2UgVUknLCBUYWhvbWEsIEdlbmV2YSwgVmVyZGFuYSwgc2Fucy1zZXJpZjsKICAgICAgICAgICAgYmFja2dyb3VuZDogbGluZWFyLWdyYWRpZW50KDEzNWRlZywgIzJjM2U1MCwgIzM0OThkYik7CiAgICAgICAgICAgIGNvbG9yOiB3aGl0ZTsKICAgICAgICAgICAgZGlzcGxheTogZmxleDsKICAgICAgICAgICAganVzdGlmeS1jb250ZW50OiBjZW50ZXI7CiAgICAgICAgICAgIGFsaWduLWl0ZW1zOiBjZW50ZXI7CiAgICAgICAgICAgIG1pbi1oZWlnaHQ6IDEwMHZoOwogICAgICAgICAgICBtYXJnaW46IDA7CiAgICAgICAgfQogICAgICAgIC5jb250YWluZXIgewogICAgICAgICAgICBiYWNrZ3JvdW5kOiByZ2JhKDI1NSwgMjU1LCAyNTUsIDAuMSk7CiAgICAgICAgICAgIHBhZGRpbmc6IDQwcHg7CiAgICAgICAgICAgIGJvcmRlci1yYWRpdXM6IDE1cHg7CiAgICAgICAgICAgIHRleHQtYWxpZ246IGNlbnRlcjsKICAgICAgICAgICAgYmFja2Ryb3AtZmlsdGVyOiBibHVyKDEwcHgpOwogICAgICAgIH0KICAgICAgICBoMSB7IGZvbnQtc2l6ZTogMi41ZW07IG1hcmdpbjogMCAwIDIwcHggMDsgfQogICAgICAgIHAgeyBmb250LXNpemU6IDEuMmVtOyB9CiAgICA8L3N0eWxlPgo8L2hlYWQ+Cjxib2R5PgogICAgPGRpdiBjbGFzcz0iY29udGFpbmVyIj4KICAgICAgICA8aDE+8J+UpyBTY2hlZHVsZWQgTWFpbnRlbmFuY2U8L2gxPgogICAgICAgIDxwPldlJ3JlIG1ha2luZyB0aGluZ3MgYmV0dGVyITwvcD4KICAgICAgICA8cD5XZSdsbCBiZSBiYWNrIHNob3J0bHkuPC9wPgogICAgPC9kaXY+CjwvYm9keT4KPC9odG1sPgo="
+
+    # Example 3: Minimal custom page
+    checkout:
+      # Base64 encoded HTML (Simple checkout maintenance page)
+      htmlBase64: "PCFET0NUWVBFIGh0bWw+CjxodG1sPgo8aGVhZD48dGl0bGU+Q2hlY2tvdXQgTWFpbnRlbmFuY2U8L3RpdGxlPjwvaGVhZD4KPGJvZHk+CiAgICA8aDE+Q2hlY2tvdXQgU3lzdGVtIE1haW50ZW5hbmNlPC9oMT4KICAgIDxwPk91ciBjaGVja291dCBzeXN0ZW0gaXMgYmVpbmcgdXBkYXRlZC4gUGxlYXNlIGNoZWNrIGJhY2sgaW4gMzAgbWludXRlcy48L3A+CjwvYm9keT4KPC9odG1sPgo="
+      json: |
+        {
+          "status": "maintenance",
+          "message": "Checkout system is being updated",
+          "retryAfter": "30 minutes"
+        }
+
+# Operator configuration
+operator:
+  maintenanceLabel: "under-maintenance"
+  maintenanceLabelValue: "true"
+  backupAnnotation: "maintenance-operator.kahf.io/original-service"
+  customPageAnnotation: "maintenance-operator.kahf.io/custom-page"
+  backupConfigMapPrefix: "maintenance-backup"

@@ -1,0 +1,27 @@
+🎉 Maintenance Operator has been installed!
+
+📝 To enable maintenance mode on an Ingress:
+   kubectl label ingress <ingress-name> {{ .Values.operator.maintenanceLabel }}={{ .Values.operator.maintenanceLabelValue }}
+
+📝 To enable maintenance mode on a Traefik IngressRoute:
+   kubectl label ingressroute <ingressroute-name> {{ .Values.operator.maintenanceLabel }}={{ .Values.operator.maintenanceLabelValue }}
+
+📝 To disable maintenance mode (remove the label):
+   kubectl label ingress <ingress-name> {{ .Values.operator.maintenanceLabel }}-
+   kubectl label ingressroute <ingressroute-name> {{ .Values.operator.maintenanceLabel }}-
+
+📝 To use a custom maintenance page:
+   kubectl annotate ingress <ingress-name> {{ .Values.operator.customPageAnnotation }}=<page-name>
+
+🔍 Check operator logs:
+   kubectl logs -n {{ .Release.Namespace }} deployment/{{ include "maintenance-operator.fullname" . }} -c operator -f
+
+🔍 Check maintenance server logs:
+   kubectl logs -n {{ .Release.Namespace }} deployment/{{ include "maintenance-operator.fullname" . }} -c server -f
+
+📊 View backup ConfigMaps:
+   kubectl get configmap -n {{ .Release.Namespace }} -l app=maintenance-operator
+
+ℹ️  Maintenance Service: {{ include "maintenance-operator.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}
+
+For more information, see the README.md

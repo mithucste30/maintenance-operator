@@ -1,0 +1,16 @@
+{{- if .Values.clusterRole.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "maintenance-operator.fullname" . }}
+  labels:
+    {{- include "maintenance-operator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "maintenance-operator.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "maintenance-operator.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

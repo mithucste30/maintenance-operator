@@ -1,0 +1,109 @@
+# Default values for maintenance-operator
+
+replicaCount: 1
+
+image:
+  repository: maintenance-operator
+  pullPolicy: IfNotPresent
+  tag: "0.1.0"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Maintenance page configuration
+maintenance:
+  # Default HTTP status code for maintenance pages
+  httpStatusCode: 503
+
+  # Default maintenance page (used when no custom page is specified)
+  # HTML is base64 encoded to keep values.yaml clean
+  defaultPage:
+    # Base64 encoded HTML (decode to see/edit the actual HTML)
+    htmlBase64: "PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImVuIj4KPGhlYWQ+CiAgICA8bWV0YSBjaGFyc2V0PSJVVEYtOCI+CiAgICA8bWV0YSBuYW1lPSJ2aWV3cG9ydCIgY29udGVudD0id2lkdGg9ZGV2aWNlLXdpZHRoLCBpbml0aWFsLXNjYWxlPTEuMCI+CiAgICA8dGl0bGU+U2l0ZSBVbmRlciBNYWludGVuYW5jZTwvdGl0bGU+CiAgICA8c3R5bGU+CiAgICAgICAgYm9keSB7CiAgICAgICAgICAgIGZvbnQtZmFtaWx5OiAtYXBwbGUtc3lzdGVtLCBCbGlua01hY1N5c3RlbUZvbnQsICdTZWdvZSBVSScsIFJvYm90bywgT3h5Z2VuLCBVYnVudHUsIENhbnRhcmVsbCwgc2Fucy1zZXJpZjsKICAgICAgICAgICAgYmFja2dyb3VuZDogbGluZWFyLWdyYWRpZW50KDEzNWRlZywgIzY2N2VlYSAwJSwgIzc2NGJhMiAxMDAlKTsKICAgICAgICAgICAgZGlzcGxheTogZmxleDsKICAgICAgICAgICAganVzdGlmeS1jb250ZW50OiBjZW50ZXI7CiAgICAgICAgICAgIGFsaWduLWl0ZW1zOiBjZW50ZXI7CiAgICAgICAgICAgIG1pbi1oZWlnaHQ6IDEwMHZoOwogICAgICAgICAgICBtYXJnaW46IDA7CiAgICAgICAgICAgIHBhZGRpbmc6IDIwcHg7CiAgICAgICAgfQogICAgICAgIC5jb250YWluZXIgewogICAgICAgICAgICBiYWNrZ3JvdW5kOiB3aGl0ZTsKICAgICAgICAgICAgYm9yZGVyLXJhZGl1czogMTBweDsKICAgICAgICAgICAgcGFkZGluZzogNDBweDsKICAgICAgICAgICAgYm94LXNoYWRvdzogMCAxMHB4IDQwcHggcmdiYSgwLDAsMCwwLjIpOwogICAgICAgICAgICB0ZXh0LWFsaWduOiBjZW50ZXI7CiAgICAgICAgICAgIG1heC13aWR0aDogNTAwcHg7CiAgICAgICAgfQogICAgICAgIGgxIHsKICAgICAgICAgICAgY29sb3I6ICMzMzM7CiAgICAgICAgICAgIG1hcmdpbjogMCAwIDIwcHggMDsKICAgICAgICAgICAgZm9udC1zaXplOiAyZW07CiAgICAgICAgfQogICAgICAgIHAgewogICAgICAgICAgICBjb2xvcjogIzY2NjsKICAgICAgICAgICAgbGluZS1oZWlnaHQ6IDEuNjsKICAgICAgICAgICAgbWFyZ2luOiAwIDAgMjBweCAwOwogICAgICAgIH0KICAgICAgICAuaWNvbiB7CiAgICAgICAgICAgIGZvbnQtc2l6ZTogNGVtOwogICAgICAgICAgICBtYXJnaW4tYm90dG9tOiAyMHB4OwogICAgICAgIH0KICAgIDwvc3R5bGU+CjwvaGVhZD4KPGJvZHk+CiAgICA8ZGl2IGNsYXNzPSJjb250YWluZXIiPgogICAgICAgIDxkaXYgY2xhc3M9Imljb24iPvCflKc8L2Rpdj4KICAgICAgICA8aDE+VW5kZXIgTWFpbnRlbmFuY2U8L2gxPgogICAgICAgIDxwPldlJ3JlIGN1cnJlbnRseSBwZXJmb3JtaW5nIHNjaGVkdWxlZCBtYWludGVuYW5jZS4gV2UnbGwgYmUgYmFjayBvbmxpbmUgc2hvcnRseS48L3A+CiAgICAgICAgPHA+VGhhbmsgeW91IGZvciB5b3VyIHBhdGllbmNlLjwvcD4KICAgIDwvZGl2Pgo8L2JvZHk+CjwvaHRtbD4K"
+
+    json: |
+      {
+        "status": "maintenance",
+        "message": "The service is currently under maintenance. Please try again later.",
+        "code": 503
+      }
+
+    xml: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <response>
+        <status>maintenance</status>
+        <message>The service is currently under maintenance. Please try again later.</message>
+        <code>503</code>
+      </response>
+
+  # Custom pages for specific ingresses/routes
+  # Format (HTML must be base64 encoded):
+  # customPages:
+  #   my-app-ingress:
+  #     htmlBase64: "PGh0bWw+Li4uPC9odG1sPg=="
+  #   another-app:
+  #     htmlBase64: "PGh0bWw+Li4uPC9odG1sPg=="
+  #     json: |
+  #       {"message": "Custom message"}
+  customPages: {}
+
+# Operator configuration
+operator:
+  # Namespaces to watch (empty means all namespaces)
+  watchNamespaces: []
+
+  # Label to trigger maintenance mode
+  maintenanceLabel: "under-maintenance"
+  maintenanceLabelValue: "true"
+
+  # Annotation to store original service reference
+  backupAnnotation: "maintenance-operator.kahf.io/original-service"
+
+  # Annotation to specify custom maintenance page
+  customPageAnnotation: "maintenance-operator.kahf.io/custom-page"
+
+  # ConfigMap name prefix for storing backups
+  backupConfigMapPrefix: "maintenance-backup"
+
+# Cluster-wide permissions (needed for watching IngressRoutes across namespaces)
+clusterRole:
+  create: true
