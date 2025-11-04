@@ -471,4 +471,4 @@ kubectl delete namespace maintenance-operator
 
 ## License
 
-Copyright (c) 2024 Kahf Infrastructure Team
+Copyright (c) 2024 MD Mazharul Islam
