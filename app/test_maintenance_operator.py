@@ -134,12 +134,15 @@ class TestMaintenanceResources:
     @patch('utils.get_html_content')
     def test_create_maintenance_resources(self, mock_get_html, mock_v1):
         """Test creating maintenance resources (ConfigMap + Pod + Service)"""
+        from kubernetes.client.rest import ApiException
+
         namespace = "default"
         ingress_name = "test-ingress"
         custom_page = "my-page"
 
         mock_get_html.return_value = "<html>Maintenance Page</html>"
-        mock_v1.read_namespaced_config_map.side_effect = Exception("Not found")
+        # ConfigMap doesn't exist yet (404), so it should be created
+        mock_v1.read_namespaced_config_map.side_effect = ApiException(status=404)
 
         service_name = create_maintenance_resources(namespace, ingress_name, custom_page)
 
