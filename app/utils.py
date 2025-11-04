@@ -15,10 +15,10 @@ from kubernetes.client.rest import ApiException
 logger = logging.getLogger(__name__)
 
 # Configuration from environment
-MAINTENANCE_ANNOTATION = os.getenv('MAINTENANCE_ANNOTATION', 'maintenance-operator.kahf.io/enabled')
+MAINTENANCE_ANNOTATION = os.getenv('MAINTENANCE_ANNOTATION', 'maintenance-operator.mithucste30.io/enabled')
 MAINTENANCE_ANNOTATION_VALUE = os.getenv('MAINTENANCE_ANNOTATION_VALUE', 'true')
-BACKUP_ANNOTATION = os.getenv('BACKUP_ANNOTATION', 'maintenance-operator.kahf.io/original-service')
-CUSTOM_PAGE_ANNOTATION = os.getenv('CUSTOM_PAGE_ANNOTATION', 'maintenance-operator.kahf.io/custom-page')
+BACKUP_ANNOTATION = os.getenv('BACKUP_ANNOTATION', 'maintenance-operator.mithucste30.io/original-service')
+CUSTOM_PAGE_ANNOTATION = os.getenv('CUSTOM_PAGE_ANNOTATION', 'maintenance-operator.mithucste30.io/custom-page')
 BACKUP_CONFIGMAP_PREFIX = os.getenv('BACKUP_CONFIGMAP_PREFIX', 'maintenance-backup')
 MAINTENANCE_SERVICE_PORT = int(os.getenv('MAINTENANCE_SERVICE_PORT', '80'))
 OPERATOR_NAMESPACE = os.getenv('POD_NAMESPACE', 'default')
@@ -175,8 +175,8 @@ def create_maintenance_resources(namespace, ingress_name, custom_page=None):
             namespace=namespace,
             labels=labels,
             annotations={
-                'maintenance-operator.kahf.io/custom-page': custom_page or 'default',
-                'maintenance-operator.kahf.io/used-by': ingress_name  # Track usage
+                'maintenance-operator.mithucste30.io/custom-page': custom_page or 'default',
+                'maintenance-operator.mithucste30.io/used-by': ingress_name  # Track usage
             }
         ),
         data={'index.html': html_content}
@@ -186,10 +186,10 @@ def create_maintenance_resources(namespace, ingress_name, custom_page=None):
         existing_cm = v1.read_namespaced_config_map(resource_name, namespace)
         # Update the used-by annotation to include this ingress
         existing_annotations = existing_cm.metadata.annotations or {}
-        used_by = existing_annotations.get('maintenance-operator.kahf.io/used-by', '')
+        used_by = existing_annotations.get('maintenance-operator.mithucste30.io/used-by', '')
         if ingress_name not in used_by.split(','):
             used_by = ','.join(filter(None, [used_by, ingress_name]))
-            existing_cm.metadata.annotations['maintenance-operator.kahf.io/used-by'] = used_by
+            existing_cm.metadata.annotations['maintenance-operator.mithucste30.io/used-by'] = used_by
             v1.patch_namespaced_config_map(resource_name, namespace, existing_cm)
             logger.info(f"Updated ConfigMap {resource_name} used-by annotation: {used_by}")
     except ApiException as e:
@@ -286,14 +286,14 @@ def delete_maintenance_resources(namespace, ingress_name, service_name):
         # Read ConfigMap to check usage
         cm = v1.read_namespaced_config_map(service_name, namespace)
         annotations = cm.metadata.annotations or {}
-        used_by = annotations.get('maintenance-operator.kahf.io/used-by', '')
+        used_by = annotations.get('maintenance-operator.mithucste30.io/used-by', '')
 
         # Remove this ingress from the used-by list
         ingresses = [i.strip() for i in used_by.split(',') if i.strip() and i.strip() != ingress_name]
 
         if ingresses:
             # Still in use by other ingresses, just update the annotation
-            cm.metadata.annotations['maintenance-operator.kahf.io/used-by'] = ','.join(ingresses)
+            cm.metadata.annotations['maintenance-operator.mithucste30.io/used-by'] = ','.join(ingresses)
             v1.patch_namespaced_config_map(service_name, namespace, cm)
             logger.info(f"Updated ConfigMap {service_name} used-by annotation: {','.join(ingresses)}")
             return

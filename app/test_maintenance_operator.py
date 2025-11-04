@@ -26,7 +26,7 @@ class TestIsUnderMaintenance:
 
     def test_returns_true_when_annotation_present(self):
         """Test returns True when maintenance annotation is present"""
-        annotations = {'maintenance-operator.kahf.io/enabled': 'true'}
+        annotations = {'maintenance-operator.mithucste30.io/enabled': 'true'}
         assert is_under_maintenance(annotations) is True
 
     def test_returns_false_when_annotation_absent(self):
@@ -36,7 +36,7 @@ class TestIsUnderMaintenance:
 
     def test_returns_false_when_annotation_is_false(self):
         """Test returns False when maintenance annotation is 'false'"""
-        annotations = {'maintenance-operator.kahf.io/enabled': 'false'}
+        annotations = {'maintenance-operator.mithucste30.io/enabled': 'false'}
         assert is_under_maintenance(annotations) is False
 
     def test_returns_false_when_annotations_none(self):
@@ -162,7 +162,7 @@ class TestMaintenanceResources:
 
         mock_configmap = Mock()
         mock_configmap.metadata.annotations = {
-            'maintenance-operator.kahf.io/used-by': ingress_name
+            'maintenance-operator.mithucste30.io/used-by': ingress_name
         }
         mock_v1.read_namespaced_config_map.return_value = mock_configmap
 
@@ -182,7 +182,7 @@ class TestMaintenanceResources:
 
         mock_configmap = Mock()
         mock_configmap.metadata.annotations = {
-            'maintenance-operator.kahf.io/used-by': 'test-ingress-1,test-ingress-2'
+            'maintenance-operator.mithucste30.io/used-by': 'test-ingress-1,test-ingress-2'
         }
         mock_v1.read_namespaced_config_map.return_value = mock_configmap
 
@@ -201,33 +201,33 @@ class TestHandlerLogic:
     def test_maintenance_annotation_triggers_enable(self):
         """Test that maintenance annotation triggers enable logic"""
         annotations = {
-            'maintenance-operator.kahf.io/enabled': 'true'
+            'maintenance-operator.mithucste30.io/enabled': 'true'
         }
 
         # Should be detected as under maintenance
         assert is_under_maintenance(annotations) is True
 
         # Should NOT have backup annotation (first time enabling)
-        assert 'maintenance-operator.kahf.io/original-service' not in annotations
+        assert 'maintenance-operator.mithucste30.io/original-service' not in annotations
 
     def test_maintenance_with_custom_page(self):
         """Test custom page annotation is recognized"""
         annotations = {
-            'maintenance-operator.kahf.io/enabled': 'true',
-            'maintenance-operator.kahf.io/custom-page': 'my-custom-page'
+            'maintenance-operator.mithucste30.io/enabled': 'true',
+            'maintenance-operator.mithucste30.io/custom-page': 'my-custom-page'
         }
 
         assert is_under_maintenance(annotations) is True
-        assert annotations.get('maintenance-operator.kahf.io/custom-page') == 'my-custom-page'
+        assert annotations.get('maintenance-operator.mithucste30.io/custom-page') == 'my-custom-page'
 
     def test_default_page_annotation(self):
         """Test default page annotation is recognized"""
         annotations = {
-            'maintenance-operator.kahf.io/enabled': 'true',
-            'maintenance-operator.kahf.io/custom-page': 'default'
+            'maintenance-operator.mithucste30.io/enabled': 'true',
+            'maintenance-operator.mithucste30.io/custom-page': 'default'
         }
 
-        custom_page = annotations.get('maintenance-operator.kahf.io/custom-page', '').strip()
+        custom_page = annotations.get('maintenance-operator.mithucste30.io/custom-page', '').strip()
         # Should not create middleware for 'default'
         assert custom_page.lower() == 'default'
 

@@ -87,7 +87,7 @@ def handle_ingress(spec, name, namespace, annotations, old, new, **kwargs):
         new_annotations = dict(annotations or {})
         new_annotations[BACKUP_ANNOTATION] = 'true'
         # Store the maintenance service name for later cleanup
-        new_annotations['maintenance-operator.kahf.io/service-name'] = maintenance_service_name
+        new_annotations['maintenance-operator.mithucste30.io/service-name'] = maintenance_service_name
 
         # Patch the Ingress
         ingress_patch = {
@@ -120,7 +120,7 @@ def handle_ingress(spec, name, namespace, annotations, old, new, **kwargs):
             logger.info(f"Custom page annotation changed from '{old_custom_page}' to '{current_custom_page}'")
 
             # Get old service name
-            old_service_name = old_annotations.get('maintenance-operator.kahf.io/service-name', '')
+            old_service_name = old_annotations.get('maintenance-operator.mithucste30.io/service-name', '')
 
             # Remove reference from old maintenance resources
             if old_service_name:
@@ -160,7 +160,7 @@ def handle_ingress(spec, name, namespace, annotations, old, new, **kwargs):
 
             # Update annotations
             new_annotations = dict(annotations or {})
-            new_annotations['maintenance-operator.kahf.io/service-name'] = new_service_name
+            new_annotations['maintenance-operator.mithucste30.io/service-name'] = new_service_name
 
             # Patch the Ingress
             ingress_patch = {
@@ -182,7 +182,7 @@ def handle_ingress(spec, name, namespace, annotations, old, new, **kwargs):
         backup_data = get_backup_configmap(name, namespace)
         if backup_data:
             # Get service name for cleanup
-            service_name = annotations.get('maintenance-operator.kahf.io/service-name', '')
+            service_name = annotations.get('maintenance-operator.mithucste30.io/service-name', '')
 
             # Restore original configuration
             ingress_patch = {
@@ -196,7 +196,7 @@ def handle_ingress(spec, name, namespace, annotations, old, new, **kwargs):
             if annotations:
                 new_annotations = dict(annotations)
                 new_annotations.pop(BACKUP_ANNOTATION, None)
-                new_annotations.pop('maintenance-operator.kahf.io/service-name', None)
+                new_annotations.pop('maintenance-operator.mithucste30.io/service-name', None)
                 ingress_patch['metadata'] = {'annotations': new_annotations}
 
             networking_v1.patch_namespaced_ingress(name, namespace, ingress_patch)

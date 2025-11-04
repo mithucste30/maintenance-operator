@@ -151,14 +151,14 @@ operator:
   watchNamespaces: []
 
   # Annotation to enable maintenance mode
-  maintenanceAnnotation: "maintenance-operator.kahf.io/enabled"
+  maintenanceAnnotation: "maintenance-operator.mithucste30.io/enabled"
   maintenanceAnnotationValue: "true"
 
   # Annotation to specify custom maintenance page
-  customPageAnnotation: "maintenance-operator.kahf.io/custom-page"
+  customPageAnnotation: "maintenance-operator.mithucste30.io/custom-page"
 
   # Annotation to store original service reference (internal use)
-  backupAnnotation: "maintenance-operator.kahf.io/original-service"
+  backupAnnotation: "maintenance-operator.mithucste30.io/original-service"
 
   # ConfigMap name prefix for storing backups (internal use)
   backupConfigMapPrefix: "maintenance-backup"

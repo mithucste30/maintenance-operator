@@ -32,7 +32,7 @@ A Kubernetes operator that manages maintenance mode for Ingress and IngressRoute
 
 ## How It Works
 
-1. **Enable maintenance mode**: Add the annotation `maintenance-operator.kahf.io/enabled: "true"` to any Ingress or IngressRoute
+1. **Enable maintenance mode**: Add the annotation `maintenance-operator.mithucste30.io/enabled: "true"` to any Ingress or IngressRoute
 2. **Operator creates resources**: The operator detects the annotation and:
    - Stores the original service configuration in a ConfigMap (backup)
    - Creates a maintenance Pod (nginx) + Service + ConfigMap in your namespace
@@ -142,21 +142,21 @@ helm install maintenance-operator . \
 For a standard Ingress:
 
 ```bash
-kubectl annotate ingress my-app maintenance-operator.kahf.io/enabled=true
+kubectl annotate ingress my-app maintenance-operator.mithucste30.io/enabled=true
 ```
 
 For a Traefik IngressRoute:
 
 ```bash
-kubectl annotate ingressroute my-app maintenance-operator.kahf.io/enabled=true
+kubectl annotate ingressroute my-app maintenance-operator.mithucste30.io/enabled=true
 ```
 
 ### Disable Maintenance Mode
 
 ```bash
-kubectl annotate ingress my-app maintenance-operator.kahf.io/enabled-
+kubectl annotate ingress my-app maintenance-operator.mithucste30.io/enabled-
 # or
-kubectl annotate ingressroute my-app maintenance-operator.kahf.io/enabled-
+kubectl annotate ingressroute my-app maintenance-operator.mithucste30.io/enabled-
 ```
 
 ### Custom Maintenance Pages
@@ -200,13 +200,13 @@ helm upgrade maintenance-operator . -n maintenance-operator
 
 # Enable maintenance with custom page (works with both Ingress and IngressRoute)
 kubectl annotate ingress my-app \
-  maintenance-operator.kahf.io/enabled=true \
-  maintenance-operator.kahf.io/custom-page=my-app
+  maintenance-operator.mithucste30.io/enabled=true \
+  maintenance-operator.mithucste30.io/custom-page=my-app
 
 # Or for IngressRoute
 kubectl annotate ingressroute my-app \
-  maintenance-operator.kahf.io/enabled=true \
-  maintenance-operator.kahf.io/custom-page=my-app
+  maintenance-operator.mithucste30.io/enabled=true \
+  maintenance-operator.mithucste30.io/custom-page=my-app
 ```
 
 #### Switch to default page
@@ -214,7 +214,7 @@ kubectl annotate ingressroute my-app \
 ```bash
 # Use "default" value or remove the annotation
 kubectl annotate ingress my-app \
-  maintenance-operator.kahf.io/custom-page=default --overwrite
+  maintenance-operator.mithucste30.io/custom-page=default --overwrite
 ```
 
 ### Static HTML Pages
@@ -231,14 +231,14 @@ Key configuration options in `values.yaml`:
 # Operator configuration
 operator:
   # Annotation to enable maintenance mode
-  maintenanceAnnotation: "maintenance-operator.kahf.io/enabled"
+  maintenanceAnnotation: "maintenance-operator.mithucste30.io/enabled"
   maintenanceAnnotationValue: "true"
 
   # Annotation to specify custom maintenance page
-  customPageAnnotation: "maintenance-operator.kahf.io/custom-page"
+  customPageAnnotation: "maintenance-operator.mithucste30.io/custom-page"
 
   # Internal annotations (managed by operator)
-  backupAnnotation: "maintenance-operator.kahf.io/original-service"
+  backupAnnotation: "maintenance-operator.mithucste30.io/original-service"
   backupConfigMapPrefix: "maintenance-backup"
 
 # Maintenance page configuration
@@ -343,13 +343,13 @@ pytest app/test_maintenance_operator.py -v
 
 ```bash
 # Enable maintenance mode
-kubectl annotate ingress my-app maintenance-operator.kahf.io/enabled=true
+kubectl annotate ingress my-app maintenance-operator.mithucste30.io/enabled=true
 
 # Check the backup was created
 kubectl get configmap -n maintenance-operator maintenance-backup-my-app
 
 # Disable maintenance mode to restore
-kubectl annotate ingress my-app maintenance-operator.kahf.io/enabled-
+kubectl annotate ingress my-app maintenance-operator.mithucste30.io/enabled-
 ```
 
 ### Example 2: Use a custom page
@@ -382,15 +382,15 @@ helm upgrade maintenance-operator . -n maintenance-operator
 
 ```bash
 kubectl annotate ingress my-app \
-  maintenance-operator.kahf.io/enabled=true \
-  maintenance-operator.kahf.io/custom-page=my-special-app
+  maintenance-operator.mithucste30.io/enabled=true \
+  maintenance-operator.mithucste30.io/custom-page=my-special-app
 ```
 
 4. Switch to default page:
 
 ```bash
 kubectl annotate ingress my-app \
-  maintenance-operator.kahf.io/custom-page=default --overwrite
+  maintenance-operator.mithucste30.io/custom-page=default --overwrite
 ```
 
 ## Troubleshooting
@@ -449,8 +449,8 @@ The script will:
 
 ```bash
 # Remove maintenance annotations from all resources (optional)
-kubectl annotate ingress --all maintenance-operator.kahf.io/enabled- --all-namespaces
-kubectl annotate ingressroute --all maintenance-operator.kahf.io/enabled- --all-namespaces
+kubectl annotate ingress --all maintenance-operator.mithucste30.io/enabled- --all-namespaces
+kubectl annotate ingressroute --all maintenance-operator.mithucste30.io/enabled- --all-namespaces
 
 # Uninstall Helm release
 helm uninstall maintenance-operator -n maintenance-operator

@@ -81,8 +81,8 @@ metadata:
     managed-by: maintenance-operator
     content-hash: a1b2c3d4
   annotations:
-    maintenance-operator.kahf.io/custom-page: "default"
-    maintenance-operator.kahf.io/used-by: "ingress1,ingress2"
+    maintenance-operator.mithucste30.io/custom-page: "default"
+    maintenance-operator.mithucste30.io/used-by: "ingress1,ingress2"
 data:
   index.html: |
     <!DOCTYPE html>...
@@ -290,26 +290,26 @@ These ConfigMaps are created by the Helm chart from `values.yaml`.
 
 **Enable maintenance mode**:
 ```yaml
-maintenance-operator.kahf.io/enabled: "true"
+maintenance-operator.mithucste30.io/enabled: "true"
 ```
 
 **Select custom page**:
 ```yaml
-maintenance-operator.kahf.io/custom-page: "my-app"
+maintenance-operator.mithucste30.io/custom-page: "my-app"
 ```
 
 ### Operator-managed Annotations
 
 **On Ingress/IngressRoute** (tracks state):
 ```yaml
-maintenance-operator.kahf.io/original-service: "true"
-maintenance-operator.kahf.io/service-name: "maintenance-a1b2c3d4"
+maintenance-operator.mithucste30.io/original-service: "true"
+maintenance-operator.mithucste30.io/service-name: "maintenance-a1b2c3d4"
 ```
 
 **On maintenance ConfigMap** (tracks usage):
 ```yaml
-maintenance-operator.kahf.io/custom-page: "default"
-maintenance-operator.kahf.io/used-by: "ingress1,ingress2,ingress3"
+maintenance-operator.mithucste30.io/custom-page: "default"
+maintenance-operator.mithucste30.io/used-by: "ingress1,ingress2,ingress3"
 ```
 
 ## RBAC Requirements

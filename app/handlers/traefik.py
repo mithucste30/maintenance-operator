@@ -68,7 +68,7 @@ def handle_ingressroute(spec, name, namespace, meta, old, new, **kwargs):
                 'annotations': {
                     **annotations,
                     BACKUP_ANNOTATION: 'true',
-                    'maintenance-operator.kahf.io/service-name': maintenance_service_name
+                    'maintenance-operator.mithucste30.io/service-name': maintenance_service_name
                 }
             },
             'spec': {
@@ -103,7 +103,7 @@ def handle_ingressroute(spec, name, namespace, meta, old, new, **kwargs):
             logger.info(f"Custom page annotation changed from '{old_custom_page}' to '{current_custom_page}'")
 
             # Get old service name
-            old_service_name = old_annotations.get('maintenance-operator.kahf.io/service-name', '')
+            old_service_name = old_annotations.get('maintenance-operator.mithucste30.io/service-name', '')
 
             # Remove reference from old maintenance resources
             if old_service_name:
@@ -128,7 +128,7 @@ def handle_ingressroute(spec, name, namespace, meta, old, new, **kwargs):
                 'metadata': {
                     'annotations': {
                         **annotations,
-                        'maintenance-operator.kahf.io/service-name': new_service_name
+                        'maintenance-operator.mithucste30.io/service-name': new_service_name
                     }
                 },
                 'spec': {
@@ -153,12 +153,12 @@ def handle_ingressroute(spec, name, namespace, meta, old, new, **kwargs):
         backup_data = get_backup_configmap(name, namespace)
         if backup_data:
             # Get service name for cleanup
-            service_name = annotations.get('maintenance-operator.kahf.io/service-name', '')
+            service_name = annotations.get('maintenance-operator.mithucste30.io/service-name', '')
 
             # Restore original configuration
             new_annotations = dict(annotations)
             new_annotations.pop(BACKUP_ANNOTATION, None)
-            new_annotations.pop('maintenance-operator.kahf.io/service-name', None)
+            new_annotations.pop('maintenance-operator.mithucste30.io/service-name', None)
 
             patch = {
                 'metadata': {

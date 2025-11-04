@@ -140,7 +140,7 @@ kubectl get ingress test-ingress -n test -o yaml
 
 # You should see:
 # - Label: under-maintenance: "true"
-# - Annotation: maintenance-operator.kahf.io/original-service: "true"
+# - Annotation: maintenance-operator.mithucste30.io/original-service: "true"
 # - Service points to: maintenance-operator
 
 # Disable maintenance mode

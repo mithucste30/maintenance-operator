@@ -20,6 +20,6 @@ logger = logging.getLogger(__name__)
 @kopf.on.startup()
 def configure(settings: kopf.OperatorSettings, **_):
     """Configure operator settings"""
-    settings.persistence.finalizer = 'maintenance-operator.kahf.io/finalizer'
+    settings.persistence.finalizer = 'maintenance-operator.mithucste30.io/finalizer'
     settings.posting.enabled = True
     logger.info("Maintenance Operator started")

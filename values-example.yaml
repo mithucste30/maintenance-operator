@@ -56,6 +56,6 @@ maintenance:
 operator:
   maintenanceLabel: "under-maintenance"
   maintenanceLabelValue: "true"
-  backupAnnotation: "maintenance-operator.kahf.io/original-service"
-  customPageAnnotation: "maintenance-operator.kahf.io/custom-page"
+  backupAnnotation: "maintenance-operator.mithucste30.io/original-service"
+  customPageAnnotation: "maintenance-operator.mithucste30.io/custom-page"
   backupConfigMapPrefix: "maintenance-backup"
