@@ -136,7 +136,24 @@ helm install maintenance-operator \
 
 ## Rollback a Release
 
-If you need to delete a release:
+### Using the Unrelease Script (Recommended)
+
+The easiest way to rollback a release is using the automated script:
+
+```bash
+# Un-release version 0.1.0
+./scripts/unrelease.sh 0.1.0
+```
+
+The script will:
+- Delete local and remote git tags
+- Delete GitHub release
+- Provide instructions for deleting container images and Helm charts
+- Optionally revert version changes in Chart.yaml and values.yaml
+
+### Manual Rollback
+
+If you prefer to do it manually:
 
 ```bash
 VERSION="0.1.0"
@@ -147,12 +164,17 @@ git tag -d v${VERSION}
 # Delete the tag remotely
 git push origin :refs/tags/v${VERSION}
 
-# Delete GitHub release (if created)
-gh release delete v${VERSION} --yes
+# Delete GitHub release (requires gh CLI)
+gh release delete v${VERSION} --yes --cleanup-tag
 
-# Note: Cannot delete already-pulled container images/charts
-# Users who pulled them will still have them
+# Delete container image (manual via GitHub UI)
+# Visit: https://github.com/mithucste30/packages/container/maintenance-operator/versions
+
+# Delete Helm chart (manual via GitHub UI)
+# Visit: https://github.com/mithucste30/packages/container/charts%2Fmaintenance-operator/versions
 ```
+
+**Note**: Container images and Helm charts that have been pulled by users cannot be removed from their systems. Deletion only prevents new pulls.
 
 ## Troubleshooting
 
@@ -265,7 +287,10 @@ After releasing:
 
 ```bash
 # Create release
-./release.sh 0.1.0
+./scripts/create-release.sh 0.1.0
+
+# Un-release (rollback)
+./scripts/unrelease.sh 0.1.0
 
 # Monitor workflow
 gh run watch
