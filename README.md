@@ -26,21 +26,20 @@ A Kubernetes operator that manages maintenance mode for Ingress and IngressRoute
 |---------|-------------------|---------------------|
 | Enable/Disable Maintenance | ✅ Yes | ✅ Yes |
 | Default Maintenance Page | ✅ Yes | ✅ Yes |
-| Custom Maintenance Pages | ❌ No* | ✅ Yes |
-| Content Negotiation | ✅ Yes | ✅ Yes |
-| Cross-namespace Support | ✅ Yes | ✅ Yes |
-
-*Custom pages require Traefik Middleware to inject the page selection header. Standard Ingress will always use the default maintenance page.
+| Custom Maintenance Pages | ✅ Yes | ✅ Yes |
+| Namespace Isolation | ✅ Yes | ✅ Yes |
+| Resource Sharing | ✅ Yes | ✅ Yes |
 
 ## How It Works
 
 1. **Enable maintenance mode**: Add the annotation `maintenance-operator.kahf.io/enabled: "true"` to any Ingress or IngressRoute
-2. **Operator takes over**: The operator detects the annotation and:
-   - Stores the original service configuration in a ConfigMap
-   - Redirects traffic to the maintenance page service
-   - Tracks the backup state
+2. **Operator creates resources**: The operator detects the annotation and:
+   - Stores the original service configuration in a ConfigMap (backup)
+   - Creates a maintenance Pod (nginx) + Service + ConfigMap in your namespace
+   - Redirects traffic to the maintenance service
+   - Multiple Ingresses with the same HTML share the same maintenance resources
 3. **Disable maintenance mode**: Remove the annotation
-4. **Automatic restore**: The operator restores the original service configuration and cleans up backups
+4. **Automatic cleanup**: The operator restores the original configuration and removes maintenance resources when no longer needed
 
 ## Installation
 
@@ -162,9 +161,7 @@ kubectl annotate ingressroute my-app maintenance-operator.kahf.io/enabled-
 
 ### Custom Maintenance Pages
 
-You can configure custom maintenance pages in the `values.yaml`.
-
-**Note:** Custom pages currently work with **Traefik IngressRoute** only. For standard Kubernetes Ingress, the default maintenance page will always be used. This is because custom pages require Traefik Middleware to inject the page selection header.
+You can configure custom maintenance pages in the `values.yaml`. Custom pages work with both Kubernetes Ingress and Traefik IngressRoute.
 
 #### Step 1: Add to values.yaml
 
@@ -201,28 +198,28 @@ maintenance:
 # Upgrade the Helm release
 helm upgrade maintenance-operator . -n maintenance-operator
 
-# Enable maintenance with custom page (IngressRoute only)
+# Enable maintenance with custom page (works with both Ingress and IngressRoute)
+kubectl annotate ingress my-app \
+  maintenance-operator.kahf.io/enabled=true \
+  maintenance-operator.kahf.io/custom-page=my-app
+
+# Or for IngressRoute
 kubectl annotate ingressroute my-app \
   maintenance-operator.kahf.io/enabled=true \
   maintenance-operator.kahf.io/custom-page=my-app
 ```
 
-#### Switch to default page (IngressRoute only)
+#### Switch to default page
 
 ```bash
 # Use "default" value or remove the annotation
-kubectl annotate ingressroute my-app \
+kubectl annotate ingress my-app \
   maintenance-operator.kahf.io/custom-page=default --overwrite
 ```
 
-### Content Negotiation
+### Static HTML Pages
 
-The maintenance server automatically serves the appropriate content type based on the `Accept` header:
-
-- `Accept: text/html` → HTML page
-- `Accept: application/json` → JSON response
-- `Accept: application/xml` → XML response
-- `Accept: */*` → HTML page (default)
+The maintenance pods serve static HTML pages using nginx. All configured HTML content is served directly from the pod's ConfigMap.
 
 ## Configuration
 
@@ -270,19 +267,50 @@ maintenance:
 
 ## Architecture
 
-The operator consists of two main components:
+The operator uses an **on-demand, per-namespace** architecture:
+
+### Components
 
 1. **Operator Controller** (kopf-based):
    - Watches Ingress and IngressRoute resources
-   - Detects maintenance label changes
-   - Manages backups and service switching
+   - Detects maintenance annotation changes
+   - Manages resource lifecycle
 
-2. **Maintenance Page Server** (Flask-based):
-   - Serves maintenance pages
-   - Handles content negotiation
-   - Returns proper HTTP status codes
+2. **Maintenance Resources** (created per namespace):
+   - **ConfigMap**: Contains HTML content for the maintenance page
+   - **Pod**: Runs nginx to serve the HTML
+   - **Service**: ClusterIP service pointing to the maintenance pod
 
-Both run in the same pod with separate containers.
+### How It Works
+
+When you enable maintenance mode on an Ingress/IngressRoute:
+
+1. **Backup**: Original service configuration saved to ConfigMap
+2. **Create Resources**: If not already present, operator creates:
+   - `maintenance-{hash}` ConfigMap with HTML content
+   - `maintenance-{hash}` Pod running nginx:alpine
+   - `maintenance-{hash}` Service pointing to the pod
+3. **Redirect**: Ingress/IngressRoute updated to point to maintenance service
+4. **Share Resources**: Multiple Ingresses with same HTML share one set of resources (same hash)
+
+When you disable maintenance mode:
+
+1. **Restore**: Original service configuration restored
+2. **Cleanup**: Operator removes reference from ConfigMap's `used-by` annotation
+3. **Delete**: If no more Ingresses use the resources, they're deleted automatically
+
+### Resource Naming
+
+Resources are named using a hash of the HTML content: `maintenance-{hash}`
+
+Example:
+- Default page → `maintenance-a1b2c3d4`
+- Custom page "my-app" → `maintenance-e5f6g7h8`
+
+This allows:
+- **Deduplication**: Multiple Ingresses with same HTML share resources
+- **Isolation**: Different HTML gets different resources
+- **Namespace isolation**: Each namespace has its own resources
 
 ## Development
 
@@ -299,10 +327,14 @@ docker build -t maintenance-operator:dev .
 pip install -r app/requirements.txt
 
 # Run the operator (requires kubectl context)
-kopf run app/operator.py --verbose
+kopf run app/maintenance_operator.py --verbose
+```
 
-# Run the maintenance server (in another terminal)
-python app/maintenance_server.py
+### Running Tests
+
+```bash
+# Run all tests
+pytest app/test_maintenance_operator.py -v
 ```
 
 ## Examples
@@ -367,16 +399,17 @@ kubectl annotate ingress my-app \
 
 ```bash
 kubectl logs -n maintenance-operator \
-  deployment/maintenance-operator \
-  -c operator -f
+  deployment/maintenance-operator -f
 ```
 
-### Check maintenance server logs
+### Check maintenance pod logs (in your namespace)
 
 ```bash
-kubectl logs -n maintenance-operator \
-  deployment/maintenance-operator \
-  -c server -f
+# List maintenance pods
+kubectl get pods -l app=maintenance-page
+
+# View logs
+kubectl logs maintenance-{hash}
 ```
 
 ### Verify backups
@@ -428,6 +461,13 @@ kubectl delete configmap -n maintenance-operator -l app=maintenance-operator
 # Delete namespace (optional)
 kubectl delete namespace maintenance-operator
 ```
+
+## Documentation
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)**: Detailed architecture and design documentation
+- **[DEPLOYMENT.md](DEPLOYMENT.md)**: Deployment and release guide
+- **[QUICKSTART.md](QUICKSTART.md)**: Quick start guide for first-time setup
+- **[CONTRIBUTING.md](CONTRIBUTING.md)**: Contributing guidelines
 
 ## License
 
