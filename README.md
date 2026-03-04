@@ -395,6 +395,42 @@ kubectl annotate ingress my-app \
 
 ## Troubleshooting
 
+### RBAC Issues
+
+If you encounter permission errors like:
+
+```
+User "system:serviceaccount:maintenance-operator:maintenance-operator" cannot list resource "ingressroutes" in API group "traefik.io" at the cluster scope
+```
+
+Use the automated RBAC verification script:
+
+```bash
+# From the repository root
+./scripts/check-rbac.sh
+
+# With custom namespace
+OPERATOR_NAMESPACE=my-namespace ./scripts/check-rbac.sh
+```
+
+For detailed troubleshooting steps, see **[RBAC_SETUP.md](RBAC_SETUP.md)** which covers:
+- Verifying ClusterRole and ClusterRoleBinding creation
+- Checking service account permissions
+- Manual RBAC resource creation
+- Common RBAC issues and solutions
+
+### Quick RBAC Fix
+
+If RBAC resources are missing, reinstall with explicit RBAC creation:
+
+```bash
+helm upgrade --install maintenance-operator . \
+  --namespace maintenance-operator \
+  --create-namespace \
+  --set clusterRole.create=true \
+  --set serviceAccount.create=true
+```
+
 ### Check operator logs
 
 ```bash

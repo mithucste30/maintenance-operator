@@ -48,4 +48,14 @@ rules:
   - apiGroups: ["apiextensions.k8s.io"]
     resources: ["customresourcedefinitions"]
     verbs: ["get", "list", "watch"]
+
+  # Kopf framework coordination leases (for leader election and state management)
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Pod permissions for watching managed maintenance pods
+  - apiGroups: [""]
+    resources: ["pods/status"]
+    verbs: ["get", "list", "watch"]
 {{- end }}
