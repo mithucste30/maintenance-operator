@@ -135,6 +135,90 @@ helm install maintenance-operator . \
   --set image.tag=dev
 ```
 
+## Upgrading
+
+### Upgrade from OCI Registry
+
+```bash
+# Upgrade to latest version
+helm upgrade maintenance-operator \
+  oci://ghcr.io/mithucste30/charts/maintenance-operator \
+  --namespace maintenance-operator
+
+# Upgrade to specific version
+helm upgrade maintenance-operator \
+  oci://ghcr.io/mithucste30/charts/maintenance-operator \
+  --version 2.0.5 \
+  --namespace maintenance-operator
+```
+
+### Upgrade from GitHub Release
+
+```bash
+# Set version
+VERSION=2.0.5
+
+# Upgrade from release tarball
+helm upgrade maintenance-operator \
+  https://github.com/mithucste30/maintenance-operator/releases/download/v${VERSION}/maintenance-operator-${VERSION}.tgz \
+  --namespace maintenance-operator
+```
+
+### Upgrade with Custom Values
+
+```bash
+# Upgrade with custom values file
+helm upgrade maintenance-operator . \
+  --namespace maintenance-operator \
+  -f custom-values.yaml
+
+# Upgrade with specific parameters
+helm upgrade maintenance-operator . \
+  --namespace maintenance-operator \
+  --set image.tag=2.0.5 \
+  --set replicaCount=2
+```
+
+### Upgrade Process
+
+The upgrade process:
+1. **Zero downtime**: Helm uses rolling updates to replace operator pods
+2. **No service interruption**: Existing maintenance pages continue to work
+3. **Automatic migration**: New version adopts existing resources
+4. **Rollback support**: Use `helm rollback maintenance-operator` if needed
+
+**Important Notes**:
+- Upgrading doesn't affect active maintenance modes
+- All existing backup ConfigMaps are preserved
+- Custom maintenance pages configured in values.yaml are retained
+- RBAC resources are updated automatically if `clusterRole.create=true`
+
+### Verify Upgrade
+
+```bash
+# Check deployment status
+kubectl rollout status deployment/maintenance-operator -n maintenance-operator
+
+# Verify new version
+kubectl get deployment maintenance-operator -n maintenance-operator -o jsonpath='{.spec.template.spec.containers[0].image}'
+
+# Check pods are running
+kubectl get pods -n maintenance-operator -l app.kubernetes.io/name=maintenance-operator
+```
+
+### Rollback if Needed
+
+```bash
+# List previous versions
+helm history maintenance-operator -n maintenance-operator
+
+# Rollback to previous version
+helm rollback maintenance-operator -n maintenance-operator
+
+# Rollback to specific revision
+helm rollback maintenance-operator 2 -n maintenance-operator
+```
+
 ## Usage
 
 ### Enable Maintenance Mode
